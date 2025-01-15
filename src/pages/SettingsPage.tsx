@@ -302,8 +302,10 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-2">
                 {config &&
                   Object.entries(config.mcpServers).map(
-                    ([name, serverConfig]) =>
-                      renderServerCard(name, serverConfig, "mcp")
+                    ([name, serverConfig]) => 
+                      <div key={`server-config-card-${name}`}>
+                        {renderServerCard(name, serverConfig, "mcp")}
+                      </div>
                   )}
                 {!config && (
                   <div className="bg-default-50 p-4 rounded-lg">
