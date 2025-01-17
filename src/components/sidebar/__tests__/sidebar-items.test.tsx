@@ -186,17 +186,17 @@ describe("useSidebarItems", () => {
 
     // Test connected server - should use server's metadata since it's connected
     const connectedServer = serverSection?.items.find(
-      (item) => item.key === "systemprompt-core"
+      (item) => item.key === "systemprompt-dev"
     );
     expect(connectedServer).toBeDefined();
     expect(connectedServer?.icon).toBe(
-      mockConfig.mcpServers["systemprompt-core"].metadata.icon
+      mockConfig.mcpServers["systemprompt-dev"].metadata.icon
     );
     expect(connectedServer?.color).toBe(
-      mockConfig.mcpServers["systemprompt-core"].metadata.color
+      mockConfig.mcpServers["systemprompt-dev"].metadata.color
     );
     expect(connectedServer?.description).toBe(
-      mockConfig.mcpServers["systemprompt-core"].metadata.description
+      mockConfig.mcpServers["systemprompt-dev"].metadata.description
     );
 
     // Test disconnected server - should use default unconnected metadata
