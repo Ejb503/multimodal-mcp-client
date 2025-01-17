@@ -2,17 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { generateLlmResponse } from "../implementation";
 import { PromptMessage } from "@modelcontextprotocol/sdk/types.js";
 
-const generateContent = vi.fn();
+// Mock the Gemini API client
+const mockGenerateContent = vi.fn();
+const mockGetGenerativeModel = vi.fn(() => ({
+  generateContent: mockGenerateContent,
+}));
 
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: class {
-    constructor() {
-      return {
-        getGenerativeModel: () => ({
-          generateContent,
-        }),
-      };
-    }
+    getGenerativeModel = mockGetGenerativeModel;
   },
 }));
 
@@ -23,7 +21,7 @@ describe("generateLlmResponse", () => {
 
   it("should use the correct Gemini model", async () => {
     const mockResponse = "Test response";
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => mockResponse,
       },
@@ -39,25 +37,29 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    await generateLlmResponse(messages, {
+    const result = await generateLlmResponse(messages, {
+      apiKey: "test-key",
       model: "gemini-2.0-flash-exp",
       temperature: 0.7,
       maxTokens: 100,
     });
 
-    expect(generateContent).toHaveBeenCalledWith({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: "Test message" }],
-        },
-      ],
+    expect(mockGetGenerativeModel).toHaveBeenCalledWith({
+      model: "gemini-2.0-flash-exp",
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 100,
+      },
+    });
+
+    expect(result).toEqual({
+      response: mockResponse,
     });
   });
 
   it("should successfully generate a response from text message", async () => {
     const mockResponse = "This is a test response";
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => mockResponse,
       },
@@ -73,9 +75,9 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
-    expect(generateContent).toHaveBeenCalledWith({
+    expect(mockGenerateContent).toHaveBeenCalledWith({
       contents: [
         {
           role: "user",
@@ -90,7 +92,7 @@ describe("generateLlmResponse", () => {
 
   it("should handle resource type messages", async () => {
     const mockResponse = "Response to resource";
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => mockResponse,
       },
@@ -109,9 +111,9 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
-    expect(generateContent).toHaveBeenCalledWith({
+    expect(mockGenerateContent).toHaveBeenCalledWith({
       contents: [
         {
           role: "model",
@@ -126,7 +128,7 @@ describe("generateLlmResponse", () => {
 
   it("should handle multiple messages", async () => {
     const mockResponse = "Response to multiple messages";
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => mockResponse,
       },
@@ -149,9 +151,9 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
-    expect(generateContent).toHaveBeenCalledWith({
+    expect(mockGenerateContent).toHaveBeenCalledWith({
       contents: [
         {
           role: "model",
@@ -169,7 +171,7 @@ describe("generateLlmResponse", () => {
   });
 
   it("should handle empty response from API", async () => {
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => "",
       },
@@ -185,7 +187,7 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
     expect(result).toEqual({
       response: "",
@@ -194,7 +196,7 @@ describe("generateLlmResponse", () => {
   });
 
   it("should handle API errors", async () => {
-    generateContent.mockRejectedValueOnce(new Error("API Error"));
+    mockGenerateContent.mockRejectedValueOnce(new Error("API Error"));
 
     const messages: PromptMessage[] = [
       {
@@ -206,7 +208,7 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
     expect(result).toEqual({
       response: "",
@@ -217,7 +219,7 @@ describe("generateLlmResponse", () => {
   it("should handle empty messages array", async () => {
     const messages: PromptMessage[] = [];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
     expect(result).toEqual({
       response: "",
@@ -236,7 +238,7 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
     expect(result).toEqual({
       response: "",
@@ -246,7 +248,7 @@ describe("generateLlmResponse", () => {
 
   it("should handle messages with mixed valid and invalid content", async () => {
     const mockResponse = "Response to valid message";
-    generateContent.mockResolvedValueOnce({
+    mockGenerateContent.mockResolvedValueOnce({
       response: {
         text: () => mockResponse,
       },
@@ -269,9 +271,9 @@ describe("generateLlmResponse", () => {
       },
     ];
 
-    const result = await generateLlmResponse(messages);
+    const result = await generateLlmResponse(messages, { apiKey: "test-key" });
 
-    expect(generateContent).toHaveBeenCalledWith({
+    expect(mockGenerateContent).toHaveBeenCalledWith({
       contents: [
         {
           role: "user",

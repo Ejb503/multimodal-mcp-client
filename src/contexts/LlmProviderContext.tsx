@@ -7,6 +7,9 @@ interface LlmProviderContextType {
     name: string;
     messages: PromptMessage[];
     params?: Record<string, unknown>;
+    _meta?: {
+      responseSchema?: Record<string, unknown>;
+    };
   }) => Promise<string>;
   isLoading: boolean;
   error: string | null;

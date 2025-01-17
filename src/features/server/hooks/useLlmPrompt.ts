@@ -4,6 +4,12 @@ import { PromptMessage } from "@modelcontextprotocol/sdk/types.js";
 interface Prompt {
   name: string;
   messages?: PromptMessage[];
+  _meta?: {
+    responseSchema?: Record<string, unknown>;
+    complexResponseSchema?: Record<string, unknown>;
+    callback?: string;
+    [key: string]: unknown;
+  };
 }
 
 interface UseLlmPromptReturn {
@@ -23,6 +29,7 @@ export function useLlmPrompt(): UseLlmPromptReturn {
       name: prompt.name,
       messages: prompt.messages,
       params,
+      _meta: prompt._meta,
     });
   };
 

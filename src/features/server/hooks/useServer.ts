@@ -19,6 +19,49 @@ interface Prompt {
     properties?: Record<string, { type: string; description?: string }>;
     required?: string[];
   };
+  _meta?: {
+    prompt?: {
+      id?: string;
+      instruction?: {
+        static: string;
+        dynamic: string;
+        state: string;
+      };
+      input?: {
+        name: string;
+        description: string;
+        schema: {
+          type: string;
+          required?: string[];
+          properties?: Record<string, { type: string; description?: string }>;
+          description?: string;
+          additionalProperties?: boolean;
+        };
+        type: string[];
+        reference: unknown[];
+      };
+      output?: {
+        name: string;
+        description: string;
+        schema: {
+          type: string;
+          required?: string[];
+          properties?: Record<string, { type: string; description?: string }>;
+          description?: string;
+          additionalProperties?: boolean;
+        };
+      };
+      metadata?: {
+        title: string;
+        description: string;
+        created: string;
+        updated: string;
+        version: number;
+        status: string;
+        tag: string[];
+      };
+    };
+  };
 }
 
 interface UseServerOptions {
@@ -326,6 +369,7 @@ export function useServer({ onError, serverId }: UseServerOptions): {
                     required,
                   }
                 : undefined,
+            _meta: rawPrompt._meta,
           };
         }
 
@@ -347,6 +391,7 @@ export function useServer({ onError, serverId }: UseServerOptions): {
                 }
               : undefined,
           messages: result.messages,
+          _meta: result._meta,
         };
 
         return promptDetails;

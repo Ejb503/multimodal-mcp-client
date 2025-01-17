@@ -13,15 +13,20 @@ export function useGeminiProvider() {
     useLlmRegistry();
 
   const executePrompt = useCallback(
-    async ({
-      name,
-      messages,
-      params,
-    }: {
+    async (params: {
       name: string;
       messages: PromptMessage[];
       params?: Record<string, unknown>;
+      _meta?: {
+        responseSchema?: Record<string, unknown>;
+        complexResponseSchema?: Record<string, unknown>;
+        callback?: string;
+      };
+      temperature?: number;
+      maxTokens?: number;
     }): Promise<string> => {
+      const { name, messages, _meta } = params;
+
       if (!messages || messages.length === 0) {
         const error = "No valid content found in messages";
         console.error("Gemini Provider - No Messages Error", { messages });
@@ -31,7 +36,7 @@ export function useGeminiProvider() {
           operation: "Execute Prompt",
           status: "error",
           name,
-          params,
+          params: params.params,
           error,
         });
         throw new Error(error);
@@ -41,12 +46,17 @@ export function useGeminiProvider() {
       setError(null);
 
       try {
-        // Use provider configuration with Gemini Flash as default
-        const result = await generateLlmResponse(messages, {
+        console.log("Executing prompt with meta:", _meta);
+        const config = {
           model: "gemini-2.0-flash-exp",
-          temperature: providerConfig?.temperature as number,
-          maxTokens: providerConfig?.maxTokens as number,
-        });
+          temperature:
+            params.temperature ?? (providerConfig?.temperature as number),
+          maxTokens: params.maxTokens ?? (providerConfig?.maxTokens as number),
+          apiKey: providerConfig?.apiKey as string,
+          _meta,
+        };
+
+        const result = await generateLlmResponse(messages, config);
 
         if (result.error) {
           console.error("Gemini Provider - API Error", result.error);
@@ -58,7 +68,7 @@ export function useGeminiProvider() {
           operation: "Execute Prompt",
           status: "success",
           name,
-          params,
+          params: params.params,
           result: {
             full: result.response,
             text: result.response,
@@ -77,7 +87,7 @@ export function useGeminiProvider() {
           operation: "Execute Prompt",
           status: "error",
           name,
-          params,
+          params: params.params,
           error: errorMessage,
         });
 

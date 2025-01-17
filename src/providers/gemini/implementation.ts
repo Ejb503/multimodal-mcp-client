@@ -1,94 +1,297 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import {
+  GoogleGenerativeAI,
+  ModelParams,
+  GenerationConfig,
+  GenerateContentRequest,
+  GenerativeModel,
+} from "@google/generative-ai";
 import { PromptMessage } from "@modelcontextprotocol/sdk/types.js";
-import { GenerateContentRequest } from "@google/generative-ai";
+import { convertToGeminiSchema } from "./utils/schema";
+import { GeminiConfig, LlmResponse } from "./types";
+import { parseAndValidateJson } from "./utils/validation";
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-export const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Constants
+const DEFAULT_MODEL = "gemini-2.0-flash-exp";
+const ERRORS = {
+  NO_CONTENT: "No valid content found in messages",
+  NO_API_KEY: "Gemini API key not configured",
+  NO_RESPONSE: "No response received from Gemini",
+  VALIDATION_RETRY_FAILED: "JSON validation failed after retry attempt",
+} as const;
 
-export interface GeminiCandidate {
-  content: {
-    parts: Array<{
-      text: string;
-    }>;
-    role: string;
+// Types
+type ResponseType =
+  | { type: "text" }
+  | { type: "schema"; schema: Record<string, unknown> }
+  | { type: "complex_schema"; schema: Record<string, unknown> };
+
+type GeminiConfigWithMeta = GeminiConfig & {
+  responseSchema?: Record<string, unknown>;
+  _meta?: {
+    responseSchema?: Record<string, unknown>;
+    complexResponseSchema?: Record<string, unknown>;
+    callback?: string;
   };
-  finishReason: string;
-  index: number;
-  safetyRatings: Array<{
-    category: string;
-    probability: string;
-  }>;
+};
+
+interface GeminiMessage {
+  role: "model" | "user";
+  parts: Array<{ text: string }>;
 }
 
-export interface GeminiResponse {
-  candidates?: GeminiCandidate[];
-  error?: string;
+// Service instance
+let genAI: GoogleGenerativeAI | null = null;
+
+/**
+ * Initializes the Gemini API client with the provided API key
+ */
+export function initializeGemini(apiKey: string): void {
+  genAI = new GoogleGenerativeAI(apiKey);
 }
 
-export interface LlmResponse {
-  response: string;
-  error?: string;
+/**
+ * Ensures the Gemini client is initialized
+ * @throws {Error} If API key is not configured
+ */
+function ensureInitialized(config: GeminiConfigWithMeta): void {
+  if (!genAI) {
+    if (!config.apiKey) {
+      throw new Error(ERRORS.NO_API_KEY);
+    }
+    initializeGemini(config.apiKey);
+  }
 }
 
-export interface GeminiConfig {
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
+/**
+ * Determines the type of response needed based on configuration
+ */
+function determineResponseType(config: GeminiConfigWithMeta): ResponseType {
+  console.log("Config:", config);
+  if (config._meta?.complexResponseSchema) {
+    return {
+      type: "complex_schema",
+      schema: config._meta.complexResponseSchema,
+    };
+  }
+  if (config._meta?.responseSchema || config.responseSchema) {
+    return {
+      type: "schema",
+      schema: config._meta?.responseSchema || config.responseSchema!,
+    };
+  }
+  return { type: "text" };
 }
 
+/**
+ * Formats a single message into Gemini's expected format
+ */
+function formatMessage(msg: PromptMessage): GeminiMessage | null {
+  let text = "";
+  if (msg.content.type === "text" && msg.content.text) {
+    text = msg.content.text;
+  } else if (msg.content.type === "resource" && msg.content.resource) {
+    text = `Resource ${msg.content.resource.uri}:\n${msg.content.resource.text}`;
+  }
+
+  if (!text) return null;
+
+  return {
+    role: msg.role === "assistant" ? "model" : "user",
+    parts: [{ text }],
+  };
+}
+
+/**
+ * Formats messages into Gemini's expected request format
+ */
+function formatMessages(messages: PromptMessage[]): GenerateContentRequest {
+  const formattedMessages = messages
+    .map(formatMessage)
+    .filter((msg): msg is GeminiMessage => msg !== null);
+
+  return { contents: formattedMessages };
+}
+
+/**
+ * Creates model configuration based on response type
+ */
+function createModelConfig(
+  config: GeminiConfigWithMeta,
+  responseType: ResponseType
+): ModelParams {
+  const baseConfig: ModelParams = {
+    model: config.model || DEFAULT_MODEL,
+    generationConfig: {
+      temperature: config.temperature,
+      maxOutputTokens: config.maxTokens,
+    } as GenerationConfig,
+  };
+
+  if (responseType.type === "schema") {
+    const convertedSchema = convertToGeminiSchema(responseType.schema);
+    return {
+      ...baseConfig,
+      generationConfig: {
+        ...baseConfig.generationConfig,
+        responseMimeType: "application/json",
+        responseSchema: convertedSchema,
+      } as GenerationConfig,
+    };
+  }
+
+  return baseConfig;
+}
+
+/**
+ * Appends schema instruction to messages for complex schema handling
+ */
+function appendSchemaInstruction(
+  messages: GenerateContentRequest,
+  schema: Record<string, unknown>
+): GenerateContentRequest {
+  const instruction = {
+    role: "user" as const,
+    parts: [
+      {
+        text: [
+          "You must return your response as a valid JSON object that strictly conforms to this schema.",
+          "Return ONLY the raw JSON without any markdown formatting, code blocks, or additional text.",
+          "The response should start with '{' and end with '}':",
+          JSON.stringify(schema, null, 2),
+        ].join("\n"),
+      },
+    ],
+  };
+
+  return {
+    contents: [...messages.contents, instruction],
+  };
+}
+
+/**
+ * Appends validation error feedback to messages
+ */
+function appendValidationFeedback(
+  messages: GenerateContentRequest,
+  error: string,
+  response: string
+): GenerateContentRequest {
+  const feedback = {
+    role: "user" as const,
+    parts: [
+      {
+        text: [
+          "The previous response failed JSON validation with the following error:",
+          error,
+          "\nHere was your previous response:",
+          response,
+          "\nPlease fix the validation errors and return a valid JSON object that conforms to the schema.",
+          "Remember to return ONLY the raw JSON without any markdown or additional text.",
+        ].join("\n"),
+      },
+    ],
+  };
+
+  return {
+    contents: [...messages.contents, feedback],
+  };
+}
+
+/**
+ * Processes the response based on the response type
+ */
+async function processResponse(
+  text: string,
+  responseType: ResponseType,
+  model: GenerativeModel,
+  messages: GenerateContentRequest
+): Promise<LlmResponse> {
+  if (!text) {
+    return { response: "", error: ERRORS.NO_RESPONSE };
+  }
+
+  switch (responseType.type) {
+    case "complex_schema": {
+      // First attempt
+      const firstAttempt = parseAndValidateJson(text, responseType.schema);
+      if (!firstAttempt.error) {
+        console.log("First Attempt:", firstAttempt.data);
+        return { response: JSON.stringify(firstAttempt.data) };
+      }
+
+      // Retry with validation error feedback
+      const messagesWithFeedback = appendValidationFeedback(
+        messages,
+        firstAttempt.error,
+        text
+      );
+
+      const retryResult = await model.generateContent(messagesWithFeedback);
+      const retryText = retryResult.response.text().trim();
+
+      const secondAttempt = parseAndValidateJson(
+        retryText,
+        responseType.schema
+      );
+      if (secondAttempt.error) {
+        return {
+          response: "",
+          error: `${ERRORS.VALIDATION_RETRY_FAILED}: ${secondAttempt.error}`,
+        };
+      }
+      console.log("Second Attempt:", secondAttempt.data);
+      return { response: JSON.stringify(secondAttempt.data) };
+    }
+    case "schema":
+    case "text":
+      return { response: text };
+  }
+}
+
+/**
+ * Generates a response using the Gemini API
+ */
 export async function generateLlmResponse(
   messages: PromptMessage[],
-  config: GeminiConfig = {}
+  config: GeminiConfigWithMeta = {}
 ): Promise<LlmResponse> {
   try {
     if (!messages.length) {
-      throw new Error("No valid content found in messages");
+      throw new Error(ERRORS.NO_CONTENT);
     }
 
-    const model = genAI.getGenerativeModel({
-      model: config.model || "gemini-2.0-flash-exp",
-      generationConfig: {
-        temperature: config.temperature,
-        maxOutputTokens: config.maxTokens,
-      },
-    });
+    console.log(
+      "Received config in generateLlmResponse:",
+      JSON.stringify(config, null, 2)
+    );
+    ensureInitialized(config);
 
-    // Format messages into a clear prompt structure
-    const formattedMessages: GenerateContentRequest = {
-      contents: messages
-        .map((msg) => {
-          let text = "";
-          if (msg.content.type === "text" && msg.content.text) {
-            text = msg.content.text;
-          } else if (msg.content.type === "resource" && msg.content.resource) {
-            text = `Resource ${msg.content.resource.uri}:\n${msg.content.resource.text}`;
-          }
-          return {
-            role: msg.role === "assistant" ? "model" : "user",
-            parts: [{ text }],
-          };
-        })
-        .filter((content) => content.parts[0].text),
-    };
+    const responseType = determineResponseType(config);
+    console.log("Determined response type:", responseType);
+
+    let formattedMessages = formatMessages(messages);
+    const modelConfig = createModelConfig(config, responseType);
+
+    if (responseType.type === "complex_schema") {
+      console.log("Handling complex schema with:", responseType.schema);
+      formattedMessages = appendSchemaInstruction(
+        formattedMessages,
+        responseType.schema
+      );
+    }
 
     if (!formattedMessages.contents.length) {
-      throw new Error("No valid content found in messages");
+      throw new Error(ERRORS.NO_CONTENT);
     }
 
-    // Send the prompt and get response
+    const model = genAI!.getGenerativeModel(modelConfig);
     const result = await model.generateContent(formattedMessages);
     const response = await result.response;
     const text = response.text().trim();
 
-    if (!text) {
-      throw new Error("No response received from Gemini");
-    }
-
-    return {
-      response: text,
-    };
+    return processResponse(text, responseType, model, formattedMessages);
   } catch (error) {
-    console.error("Gemini API error:", error);
+    console.error("Error in generateLlmResponse:", error);
     return {
       response: "",
       error: error instanceof Error ? error.message : "An error occurred",
