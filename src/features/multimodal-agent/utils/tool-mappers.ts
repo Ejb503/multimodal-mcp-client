@@ -18,16 +18,6 @@ type GeminiPropertyType = {
   properties?: Record<string, GeminiPropertyType & { description: string }>;
 };
 
-type GeminiParameter = {
-  type: SchemaType;
-  description: string;
-};
-
-const DEFAULT_MESSAGE_PARAM: GeminiParameter = {
-  type: SchemaType.STRING,
-  description: "Message to include with the command",
-};
-
 export const sanitizeFunctionName = (name: string): string => {
   return name.replace(/[^a-zA-Z0-9_]/g, "_");
 };
@@ -214,10 +204,7 @@ export const createDefaultToolParameters = (tool: Tool) => ({
   description: tool.description || undefined,
   parameters: {
     type: SchemaType.OBJECT,
-    properties: {
-      _message: DEFAULT_MESSAGE_PARAM,
-    },
-    required: ["_message"],
+    properties: {},
   },
 });
 
@@ -234,20 +221,6 @@ export const mapToolProperties = (tool: Tool) => {
   const mappedSchema = mapPropertyType(tool.inputSchema as JSONSchema7);
   const properties = mappedSchema.properties || {};
   const required = getRequiredFields(tool.inputSchema as JSONSchema7);
-
-  // Add _message only if no required fields
-  if (required.length === 0) {
-    properties._message = DEFAULT_MESSAGE_PARAM;
-    return {
-      name: sanitizeFunctionName(tool.name),
-      description: tool.description || undefined,
-      parameters: {
-        type: SchemaType.OBJECT,
-        properties,
-        required: ["_message"],
-      },
-    };
-  }
 
   return {
     name: sanitizeFunctionName(tool.name),

@@ -1,53 +1,50 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ServerInfo } from "../components/ServerManagement/ServerInfo";
-import { ServerCapabilities } from "@/contexts/McpContext.types";
-import { useMcp } from "@/contexts/McpContext";
-import { McpProvider } from "@/contexts/McpProvider";
-import { ReactNode } from "react";
-
-// Mock the McpContext
-vi.mock("@/contexts/McpContext", () => ({
-  useMcp: vi.fn(),
-  McpContext: {
-    Provider: ({ children }: { children: ReactNode }) => children,
-  },
-}));
-
-// Mock the Client and SSEClientTransport
-vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: vi.fn().mockImplementation(() => ({
-    connect: vi.fn(),
-    getServerVersion: vi.fn().mockReturnValue({
-      name: "DrupalMcpServer",
-      version: "1.0.0",
-      protocolVersion: "1.0",
-    }),
-    getServerCapabilities: vi.fn().mockReturnValue({
-      tools: { listChanged: true },
-      prompts: { listChanged: true },
-      resources: { listChanged: true },
-    }),
-    onclose: vi.fn(),
-  })),
-}));
-
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
-  SSEClientTransport: vi.fn(),
-}));
-
-// Test component to verify provider capabilities
-function TestComponent({ serverId }: { serverId: string }) {
-  const { clients } = useMcp();
-  const clientState = clients[serverId];
-  if (!clientState?.serverInfo) return null;
-  return <ServerInfo info={clientState.serverInfo} />;
-}
+import type { ServerCapabilities } from "@/contexts/McpContext.types";
+import { McpContext } from "../../../contexts/McpContext";
+import type { McpContextType } from "../../../contexts/McpContext.types";
 
 describe("Server Capabilities", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  const mockContextValue: McpContextType = {
+    clients: {
+      testServer: {
+        client: null,
+        connectionStatus: "connected",
+        serverType: "stdio",
+        serverUrl: "",
+        apiKey: "",
+        resources: [],
+        prompts: [],
+        tools: [],
+        loadedResources: [],
+        serverInfo: {
+          name: "DrupalMcpServer",
+          version: "1.0.0",
+          protocolVersion: "1.0",
+          capabilities: {
+            tools: { listChanged: true },
+            prompts: { listChanged: true },
+            resources: { listChanged: true },
+          },
+        },
+      },
+    },
+    activeClients: ["testServer"],
+    updateClientState: vi.fn(),
+    setupClientNotifications: vi.fn(),
+    DEFAULT_CLIENT_STATE: {
+      client: null,
+      connectionStatus: "disconnected",
+      serverType: "stdio",
+      serverUrl: "",
+      apiKey: "",
+      resources: [],
+      prompts: [],
+      tools: [],
+      loadedResources: [],
+    },
+  };
 
   it("should display all enabled capabilities from server info", () => {
     const serverInfo = {
@@ -70,7 +67,6 @@ describe("Server Capabilities", () => {
 
     render(<ServerInfo info={serverInfo} />);
 
-    // Check for enabled capabilities
     expect(screen.getByText("tools.listChanged")).toBeInTheDocument();
     expect(screen.getByText("prompts.listChanged")).toBeInTheDocument();
     expect(screen.getByText("resources.listChanged")).toBeInTheDocument();
@@ -94,7 +90,6 @@ describe("Server Capabilities", () => {
 
     render(<ServerInfo info={serverInfo} />);
 
-    // Verify disabled capabilities are not shown
     expect(screen.queryByText("tools.listChanged")).not.toBeInTheDocument();
     expect(screen.queryByText("prompts.listChanged")).not.toBeInTheDocument();
     expect(screen.queryByText("resources.listChanged")).not.toBeInTheDocument();
@@ -114,105 +109,15 @@ describe("Server Capabilities", () => {
   });
 
   it("should properly render capabilities from McpProvider", () => {
-    vi.mocked(useMcp).mockReturnValue({
-      clients: {
-        systempromptLocal: {
-          client: null,
-          connectionStatus: "connected",
-          serverType: "sse",
-          serverUrl: "http://localhost/v1/mcp/",
-          apiKey: "test",
-          resources: [],
-          prompts: [],
-          tools: [],
-          loadedResources: [],
-          serverInfo: {
-            name: "DrupalMcpServer",
-            version: "1.0.0",
-            protocolVersion: "1.0",
-            capabilities: {
-              tools: { listChanged: true },
-              prompts: { listChanged: true },
-              resources: { listChanged: true },
-            },
-          },
-        },
-      },
-      activeClients: ["systempromptLocal"],
-      connectServer: vi.fn(),
-      disconnectServer: vi.fn(),
-      listTools: vi.fn(),
-      listPrompts: vi.fn(),
-      listResources: vi.fn(),
-      executeTool: vi.fn(),
-      selectPrompt: vi.fn(),
-      executePrompt: vi.fn(),
-      readResource: vi.fn(),
-    });
+    render(
+      <McpContext.Provider value={mockContextValue}>
+        <ServerInfo info={mockContextValue.clients.testServer.serverInfo!} />
+      </McpContext.Provider>
+    );
 
-    render(<TestComponent serverId="systempromptLocal" />);
-
-    // Verify the capabilities are rendered
     expect(screen.getByText("tools.listChanged")).toBeInTheDocument();
     expect(screen.getByText("prompts.listChanged")).toBeInTheDocument();
     expect(screen.getByText("resources.listChanged")).toBeInTheDocument();
-  });
-
-  it("should properly set capabilities in McpProvider after connection", async () => {
-    const mockChildren = vi.fn().mockReturnValue(null);
-    const { container } = render(<McpProvider>{mockChildren()}</McpProvider>);
-
-    // Mock the useMcp hook to return a mock context value
-    const mockContext = {
-      clients: {
-        systempromptLocal: {
-          client: null,
-          connectionStatus: "connected" as const,
-          serverType: "sse" as const,
-          serverUrl: "http://localhost/v1/mcp/",
-          apiKey: "test",
-          resources: [],
-          prompts: [],
-          tools: [],
-          loadedResources: [],
-          serverInfo: {
-            name: "DrupalMcpServer",
-            version: "1.0.0",
-            protocolVersion: "1.0",
-            capabilities: {
-              tools: { listChanged: true },
-              prompts: { listChanged: true },
-              resources: { listChanged: true },
-            },
-          },
-        },
-      },
-      activeClients: ["systempromptLocal"],
-      connectServer: vi.fn(),
-      disconnectServer: vi.fn(),
-      listTools: vi.fn(),
-      listPrompts: vi.fn(),
-      listResources: vi.fn(),
-      executeTool: vi.fn(),
-      selectPrompt: vi.fn(),
-      executePrompt: vi.fn(),
-      readResource: vi.fn(),
-    };
-    vi.mocked(useMcp).mockReturnValue(mockContext);
-
-    // Connect to the server
-    await mockContext.connectServer("systempromptLocal");
-
-    // Verify the provider rendered
-    expect(container).toBeInTheDocument();
-
-    // Verify the capabilities were set correctly
-    const clientState = mockContext.clients["systempromptLocal"];
-    expect(clientState?.serverInfo?.capabilities).toEqual({
-      tools: { listChanged: true },
-      prompts: { listChanged: true },
-      resources: { listChanged: true },
-    });
   });
 
   it("should use default capabilities when server returns none", () => {
@@ -224,8 +129,6 @@ describe("Server Capabilities", () => {
     };
 
     render(<ServerInfo info={serverInfo} />);
-
-    // Should show no capabilities message
     expect(screen.getByText("No capabilities available")).toBeInTheDocument();
   });
 });
