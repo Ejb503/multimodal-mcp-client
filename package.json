@@ -11,7 +11,7 @@
     "lint:ts": "eslint .",
     "preview": "vite preview",
     "start": "npm run build && concurrently \"npm run proxy\" \"npm run preview\"",
-    "test": "vitest run --reporter verbose > output/test-output.txt",
+    "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage"
   },
@@ -44,6 +44,7 @@
     "@eslint/js": "^9.17.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^14.3.1",
+    "@testing-library/react-hooks": "^8.0.1",
     "@testing-library/user-event": "^14.5.2",
     "@types/cors": "^2.8.17",
     "@types/eventsource": "^1.1.15",
