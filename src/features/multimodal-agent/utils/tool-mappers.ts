@@ -177,7 +177,7 @@ export const mapPropertyType = (
   }
 };
 
-const getRequiredFields = (schema: JSONSchema7): string[] => {
+const getRequiredFields = (schema: JSONSchema7): string[] | undefined => {
   if (schema.required && Array.isArray(schema.required)) {
     return schema.required;
   }
@@ -196,7 +196,7 @@ const getRequiredFields = (schema: JSONSchema7): string[] => {
     }
   }
 
-  return [];
+  return undefined;
 };
 
 export const createDefaultToolParameters = (tool: Tool) => ({
@@ -219,7 +219,16 @@ export const mapToolProperties = (tool: Tool) => {
   }
 
   const mappedSchema = mapPropertyType(tool.inputSchema as JSONSchema7);
-  const properties = mappedSchema.properties || {};
+  const properties =
+    Object.keys(mappedSchema.properties || {}).length === 0
+      ? {
+          _placeholder: {
+            type: SchemaType.STRING,
+            description: "Placeholder field for empty schema",
+          },
+        }
+      : mappedSchema.properties || {};
+
   const required = getRequiredFields(tool.inputSchema as JSONSchema7);
 
   return {
@@ -228,7 +237,7 @@ export const mapToolProperties = (tool: Tool) => {
     parameters: {
       type: SchemaType.OBJECT,
       properties,
-      required,
+      ...(required && { required }),
     },
   };
 };

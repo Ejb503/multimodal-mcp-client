@@ -30,13 +30,18 @@ const mockConfig = {
     serverTypes: {
       stdio: {
         icon: "solar:server-minimalistic-line-duotone",
-        color: "primary",
+        color: "primary" as const,
         description: "Local stdio-based MCP server",
+      },
+      remote: {
+        icon: "solar:server-square-line-duotone",
+        color: "secondary" as const,
+        description: "Remote MCP server",
       },
     },
     unconnected: {
       icon: "solar:server-square-line-duotone",
-      color: "secondary",
+      color: "secondary" as const,
       description: "Remote MCP server (not connected)",
     },
   },
@@ -46,18 +51,20 @@ const mockConfig = {
       args: [],
       metadata: {
         icon: "solar:programming-line-duotone",
-        color: "success",
+        color: "success" as const,
         description: "Systemprompt Agent MCP server",
       },
+      type: "stdio",
     },
     "systemprompt-agent-server": {
       command: "npx",
       args: [],
       metadata: {
         icon: "solar:programming-line-duotone",
-        color: "success",
+        color: "success" as const,
         description: "Systemprompt Agent MCP server",
       },
+      type: "stdio",
     },
   },
 };
@@ -78,11 +85,18 @@ const wrapper = ({ children }: { children: ReactNode }) => {
       prompts: [],
       tools: [],
       loadedResources: [],
+      serverInfo: {
+        name: "systemprompt-dev",
+        version: "1.0.0",
+        protocolVersion: "1.0.0",
+        capabilities: {},
+        metadata: mockConfig.mcpServers["systemprompt-dev"].metadata,
+      },
       serverConfig: {
         key: "systemprompt-dev",
         label: "Systemprompt Dev",
         icon: mockConfig.mcpServers["systemprompt-dev"].metadata.icon,
-        color: "success",
+        color: mockConfig.mcpServers["systemprompt-dev"].metadata.color,
         description:
           mockConfig.mcpServers["systemprompt-dev"].metadata.description,
         serverId: "systemprompt-dev",
@@ -98,11 +112,12 @@ const wrapper = ({ children }: { children: ReactNode }) => {
       prompts: [],
       tools: [],
       loadedResources: [],
+      serverInfo: undefined,
       serverConfig: {
         key: "systemprompt-agent-server",
         label: "Systemprompt Agent Server",
         icon: mockConfig.defaults.unconnected.icon,
-        color: "secondary",
+        color: mockConfig.defaults.unconnected.color,
         description: mockConfig.defaults.unconnected.description,
         serverId: "systemprompt-agent-server",
       },
@@ -121,6 +136,10 @@ const wrapper = ({ children }: { children: ReactNode }) => {
     listTools: vi.fn(),
     executeTool: vi.fn(),
     readResource: vi.fn(),
+    requestSampling: vi.fn(),
+    pendingSampleRequests: [],
+    handleApproveSampling: vi.fn(),
+    handleRejectSampling: vi.fn(),
   };
 
   return (
@@ -163,22 +182,39 @@ describe("useSidebarItems", () => {
       (s) => s.title === "Servers"
     );
     expect(serverSection).toBeDefined();
+    expect(serverSection?.items).toHaveLength(2);
 
-    // Test connected server
+    // Test connected server - should use server's metadata since it's connected
     const connectedServer = serverSection?.items.find(
-      (item) => item.serverId === "systemprompt-dev"
+      (item) => item.key === "systemprompt-core"
     );
+    expect(connectedServer).toBeDefined();
     expect(connectedServer?.icon).toBe(
-      mockConfig.mcpServers["systemprompt-dev"].metadata.icon
+      mockConfig.mcpServers["systemprompt-core"].metadata.icon
     );
-    expect(connectedServer?.color).toBe("success");
+    expect(connectedServer?.color).toBe(
+      mockConfig.mcpServers["systemprompt-core"].metadata.color
+    );
+    expect(connectedServer?.description).toBe(
+      mockConfig.mcpServers["systemprompt-core"].metadata.description
+    );
 
-    // Test disconnected server
+    // Test disconnected server - should use default unconnected metadata
     const disconnectedServer = serverSection?.items.find(
-      (item) => item.serverId === "systemprompt-agent-server"
+      (item) => item.key === "systemprompt-agent-server"
     );
+    expect(disconnectedServer).toBeDefined();
     expect(disconnectedServer?.icon).toBe(mockConfig.defaults.unconnected.icon);
-    expect(disconnectedServer?.color).toBe("secondary");
+    expect(disconnectedServer?.color).toBe(
+      mockConfig.defaults.unconnected.color
+    );
+    expect(disconnectedServer?.description).toBe(
+      mockConfig.defaults.unconnected.description
+    );
+
+    // Verify server IDs are set correctly
+    expect(connectedServer?.serverId).toBe("systemprompt-dev");
+    expect(disconnectedServer?.serverId).toBe("systemprompt-agent-server");
   });
 
   it("should handle navigation when clicking items", () => {

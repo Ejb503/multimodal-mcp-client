@@ -79,6 +79,80 @@ function configWriterPlugin() {
         res.statusCode = 200; // Return empty array on error instead of 500
         res.end(JSON.stringify({ agents: [] }));
       }
+    } else if (req.method === "POST" && req.url === "/api/update-env") {
+      try {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const data = JSON.parse(Buffer.concat(chunks).toString());
+        const envPath = path.resolve(__dirname, ".env");
+
+        // Read existing .env content
+        let envContent = "";
+        try {
+          envContent = await fs.readFile(envPath, "utf-8");
+        } catch (readError) {
+          console.log("Creating new .env file");
+        }
+
+        // Update or add each environment variable
+        Object.entries(data).forEach(([key, value]) => {
+          const regex = new RegExp(`^${key}=.*$`, "m");
+          const newLine = `${key}=${value}`;
+
+          if (regex.test(envContent)) {
+            envContent = envContent.replace(regex, newLine);
+          } else {
+            envContent += envContent.endsWith("\n") ? newLine : `\n${newLine}`;
+          }
+        });
+
+        // Write back to .env
+        await fs.writeFile(envPath, envContent.trim() + "\n");
+
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        console.error("Error updating .env:", error);
+        res.statusCode = 500;
+        res.end(
+          JSON.stringify({
+            error: "Failed to update environment variables",
+            details: error instanceof Error ? error.message : "Unknown error",
+          })
+        );
+      }
+    } else if (req.method === "POST" && req.url === "/api/validate-key") {
+      try {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        const { apiKey } = JSON.parse(Buffer.concat(chunks).toString());
+
+        // Validate the API key with the SystemPrompt API
+        const response = await fetch("http://127.0.0.1/v1/user/mcp", {
+          method: "GET",
+          headers: {
+            "api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ error: "Invalid API key" }));
+          return;
+        }
+
+        res.statusCode = 200;
+        res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        console.error("Error validating API key:", error);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ error: "Failed to validate API key" }));
+      }
     } else if (req.url?.startsWith("/api/")) {
       // Handle unknown API routes with 404
       res.statusCode = 404;

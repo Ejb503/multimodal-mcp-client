@@ -15,6 +15,8 @@ import {
   CallToolResultSchema,
   CreateMessageRequest,
   CreateMessageResult,
+  CreateMessageRequestSchema,
+  CreateMessageResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { createSamplingError } from "../hooks/useMcpSampling.types";
 import type { PendingSampleRequest } from "../hooks/useMcpSampling.types";
@@ -75,34 +77,80 @@ export function McpProvider({ children }: { children: React.ReactNode }) {
     requestId: number,
     response?: CreateMessageResult
   ) => {
+    console.log("Debug - Handling sampling approval:", {
+      requestId,
+      timestamp: new Date().toISOString(),
+      hasResponse: Boolean(response),
+    });
+
     const request = pendingSampleRequests.find((r) => r.id === requestId);
-    if (!request) return;
+    if (!request) {
+      console.log("Debug - No pending request found:", { requestId });
+      return;
+    }
 
     const { serverId, request: messageRequest, resolve, reject } = request;
 
     setPendingSampleRequests((prev) => prev.filter((r) => r.id !== requestId));
 
     if (response) {
+      console.log("Debug - Using provided response:", {
+        requestId,
+        timestamp: new Date().toISOString(),
+      });
       resolve(response);
       return;
     }
 
-    const client = clients[serverId]?.client;
-    if (!client) {
+    const clientState = clients[serverId];
+    console.log("Debug - Checking client for message creation:", {
+      serverId,
+      timestamp: new Date().toISOString(),
+      hasClient: Boolean(clientState?.client),
+      connectionStatus: clientState?.connectionStatus,
+    });
+
+    if (!clientState?.client) {
+      console.log("Debug - No client available for message creation:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+      });
       reject(createSamplingError("Client not available", "NO_CLIENT"));
       return;
     }
 
     try {
-      const result = await (
-        client as unknown as {
-          createMessage: (
-            req: CreateMessageRequest["params"]
-          ) => Promise<CreateMessageResult>;
-        }
-      ).createMessage(messageRequest);
+      console.log("Debug - Creating message:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        request: messageRequest,
+      });
+
+      const result = await clientState.client.request(
+        {
+          method: "sampling/createMessage",
+          params: messageRequest,
+        },
+        CreateMessageResultSchema
+      );
+
+      console.log("Debug - Message created successfully:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        result,
+      });
+
       resolve(result);
     } catch (error) {
+      console.error("Debug - Error creating message:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        error,
+        clientState: {
+          hasClient: Boolean(clientState?.client),
+          connectionStatus: clientState?.connectionStatus,
+        },
+      });
       reject(error instanceof Error ? error : new Error(String(error)));
     }
   };
@@ -120,15 +168,25 @@ export function McpProvider({ children }: { children: React.ReactNode }) {
 
   const { connectServer, disconnectServer } = useMcpConnection(
     updateClientState,
-    (client, serverId) => setupClientNotifications(serverId, client),
-    (
-      request: CreateMessageRequest["params"],
-      resolve: (result: CreateMessageResult) => void,
-      reject: (error: Error) => void
-    ) => {
-      // Get the first active client ID as the default server
-      const serverId = activeClients[0] || "default";
-      requestSampling(serverId, request).then(resolve).catch(reject);
+    (request, resolve, reject, serverId) => {
+      console.log("Debug - Handling sampling request from server:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        request,
+      });
+
+      // Add the request to pending requests for user approval
+      setPendingSampleRequests((prev) => [
+        ...prev,
+        {
+          id: nextRequestId.current++,
+          serverId,
+          request,
+          resolve,
+          reject,
+          progress: undefined,
+        },
+      ]);
     }
   );
 
@@ -194,11 +252,43 @@ export function McpProvider({ children }: { children: React.ReactNode }) {
     serverId: string,
     params: { name: string; args: Record<string, unknown> }
   ) => {
+    console.log("Debug - Tool execution started:", {
+      serverId,
+      timestamp: new Date().toISOString(),
+      toolName: params.name,
+      clientsAvailable: Object.keys(clients),
+    });
+
     const clientState = clients[serverId];
+    console.log("Debug - Tool execution client state:", {
+      serverId,
+      timestamp: new Date().toISOString(),
+      hasClient: Boolean(clientState?.client),
+      connectionStatus: clientState?.connectionStatus,
+      toolCount: clientState?.tools?.length,
+    });
+
     if (!clientState?.client) {
+      console.log("Debug - No client available for tool execution:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        availableClients: Object.keys(clients).map((id) => ({
+          id,
+          hasClient: Boolean(clients[id]?.client),
+          status: clients[id]?.connectionStatus,
+        })),
+      });
       throw new Error("No MCP client available");
     }
+
     try {
+      console.log("Debug - Calling tool:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        toolName: params.name,
+        args: params.args,
+      });
+
       const response = await clientState.client.callTool(
         {
           name: params.name,
@@ -206,9 +296,24 @@ export function McpProvider({ children }: { children: React.ReactNode }) {
         },
         CallToolResultSchema
       );
+
+      console.log("Debug - Tool execution successful:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        toolName: params.name,
+      });
+
       return response as ToolCall;
     } catch (error) {
-      console.error("Error in executeTool:", error);
+      console.error("Debug - Error in executeTool:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        error,
+        clientState: {
+          hasClient: Boolean(clientState?.client),
+          connectionStatus: clientState?.connectionStatus,
+        },
+      });
       throw error;
     }
   };

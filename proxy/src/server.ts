@@ -46,11 +46,9 @@ export class ProxyServer {
     transportType: TransportType;
     serverId: string;
   } {
-    const { transportType, serverId } = query;
-
-    if (typeof serverId !== "string") {
-      throw new Error("Server ID must be specified");
-    }
+    const serverId =
+      typeof query.serverId === "string" ? query.serverId : "default";
+    const transportType = query.transportType;
 
     if (transportType !== "stdio" && transportType !== "sse") {
       throw new Error("Invalid transport type specified");
@@ -85,6 +83,7 @@ export class ProxyServer {
   private async createStdioTransport(
     serverId: string
   ): Promise<StdioClientTransport> {
+    console.log(serverId);
     const serverConfig = this.config.mcpServers[serverId];
     if (!serverConfig) {
       throw new Error(`No configuration found for server: ${serverId}`);

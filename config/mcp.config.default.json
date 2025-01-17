@@ -19,8 +19,8 @@
         }
     },
     "mcpServers": {
-        "windows-systemprompt-agent-server": {
-            "command": "C:\\Program Files\\nodejs\\npx.cmd",
+        "systemprompt-core": {
+            "command": "npx",
             "args": [
                 "-y",
                 "systemprompt-agent-server"
@@ -31,17 +31,18 @@
             "metadata": {
                 "icon": "solar:programming-line-duotone",
                 "color": "success",
-                "description": "Systemprompt Agent MCP server"
+                "description": "Systemprompt Core MCP server"
             }
         },
-        "linux-systemprompt-agent-server": {
-            "command": "npx",
+        "default": {
+            "command": "C:\\Program Files\\nodejs\\npx.cmd",
             "args": [
                 "-y",
-                "@modelcontextprotocol/server-systemprompt"
+                "systemprompt-mcp-notion"
             ],
             "env": {
-                "SYSTEMPROMPT_API_KEY": ""
+                "NOTION_API_KEY": "xxx",
+                "SYSTEMPROMPT_API_KEY": "xxx"
             },
             "metadata": {
                 "icon": "solar:programming-line-duotone",
@@ -49,18 +50,19 @@
                 "description": "Systemprompt Agent MCP server"
             }
         },
-        "example-extension": {
+        "systemprompt-mcp-notion": {
             "command": "node",
             "args": [
-                "./extensions/systemprompt-mcp-google/build/index.js"
+                "C:\\Users\\ejb50\\Websites\\mcp-server-systemprompt-notion\\build\\index.js"
             ],
             "env": {
-                "SYSTEMPROMPT_API_KEY": ""
+                "NOTION_API_KEY": "xxx",
+                "SYSTEMPROMPT_API_KEY": "xxx"
             },
             "metadata": {
-                "icon": "solar:extension-line-duotone",
-                "color": "info",
-                "description": "Example extension for demonstration purposes"
+                "icon": "solar:notebook-line-duotone",
+                "color": "primary",
+                "description": "Systemprompt Notion MCP server"
             }
         }
     }

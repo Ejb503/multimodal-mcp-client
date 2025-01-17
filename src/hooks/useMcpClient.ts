@@ -20,15 +20,40 @@ export function useMcpClient() {
 
   const updateClientState = useCallback(
     (serverId: string, update: Partial<McpClientState>) => {
-      setClients((prev) => ({
-        ...prev,
-        [serverId]: {
-          ...prev[serverId],
-          ...update,
+      console.log("Debug - Updating client state:", {
+        serverId,
+        timestamp: new Date().toISOString(),
+        currentState: clients[serverId],
+        update: {
+          hasClient: Boolean(update.client),
+          connectionStatus: update.connectionStatus,
+          toolCount: update.tools?.length,
         },
-      }));
+      });
+
+      setClients((prev) => {
+        const newState = {
+          ...prev,
+          [serverId]: {
+            ...prev[serverId],
+            ...update,
+          },
+        };
+
+        console.log("Debug - Client state updated:", {
+          serverId,
+          timestamp: new Date().toISOString(),
+          newState: {
+            hasClient: Boolean(newState[serverId]?.client),
+            connectionStatus: newState[serverId]?.connectionStatus,
+            toolCount: newState[serverId]?.tools?.length,
+          },
+        });
+
+        return newState;
+      });
     },
-    []
+    [clients]
   );
 
   const setupClientNotifications = useCallback(

@@ -19,8 +19,12 @@ describe("mapToolProperties", () => {
       description: "Test tool",
       parameters: {
         type: "object",
-        properties: {},
-        required: [],
+        properties: {
+          _placeholder: {
+            type: "string",
+            description: "Placeholder field for empty schema",
+          },
+        },
       },
     });
   });
@@ -41,8 +45,12 @@ describe("mapToolProperties", () => {
       description: "Test tool",
       parameters: {
         type: "object",
-        properties: {},
-        required: [],
+        properties: {
+          _placeholder: {
+            type: "string",
+            description: "Placeholder field for empty schema",
+          },
+        },
       },
     });
   });
@@ -70,7 +78,6 @@ describe("mapToolProperties", () => {
           field1: { type: "string", description: "" },
           field2: { type: "number", description: "" },
         },
-        required: [],
       },
     });
   });
@@ -111,7 +118,6 @@ describe("mapToolsToGeminiFormat", () => {
           properties: {
             field1: { type: "string", description: "" },
           },
-          required: [],
         },
       },
       {
@@ -122,7 +128,6 @@ describe("mapToolsToGeminiFormat", () => {
           properties: {
             field2: { type: "number", description: "" },
           },
-          required: [],
         },
       },
     ]);

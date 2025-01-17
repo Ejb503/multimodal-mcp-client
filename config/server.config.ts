@@ -71,7 +71,9 @@ export function getRawServerConfig(
   id: string,
   config: McpConfig
 ): SSEServerConfig | StdioServerConfig | undefined {
-  const serverConfig = config.sse?.systemprompt || config.mcpServers[id];
+  const serverType = getServerType(id, config);
+  const serverConfig =
+    serverType === "sse" ? config.sse?.[id] : config.mcpServers[id];
   if (!serverConfig) return undefined;
 
   return "url" in serverConfig
