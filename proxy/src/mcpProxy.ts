@@ -13,14 +13,17 @@ export default function mcpProxy({
   let transportToServerClosed = false;
 
   transportToClient.onmessage = (message) => {
+    console.log("transportToClient.onmessage", message);
     transportToServer.send(message).catch(onerror);
   };
 
   transportToServer.onmessage = (message) => {
+    console.log("transportToServer.onmessage", message);
     transportToClient.send(message).catch(onerror);
   };
 
   transportToClient.onclose = () => {
+    console.log("transportToClient.onclose");
     if (transportToServerClosed) {
       return;
     }
@@ -30,6 +33,7 @@ export default function mcpProxy({
   };
 
   transportToServer.onclose = () => {
+    console.log("transportToServer.onclose");
     if (transportToClientClosed) {
       return;
     }
