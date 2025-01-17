@@ -4,6 +4,8 @@ import type {
   Prompt,
   Resource,
   Tool,
+  CreateMessageRequest,
+  CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import type { ServerMetadata } from "../../config/types";
@@ -11,11 +13,21 @@ import type { ServerMetadata } from "../../config/types";
 export type { ServerMetadata };
 export type ToolCall = z.infer<typeof CallToolResultSchema>;
 
+export interface ExperimentalCapabilities {
+  sampling?: {
+    /**
+     * Whether this server supports sampling requests.
+     */
+    sample?: boolean;
+  };
+  [key: string]: unknown;
+}
+
 export interface ServerCapabilities {
   /**
    * Experimental, non-standard capabilities that the server supports.
    */
-  experimental?: { [key: string]: object };
+  experimental?: ExperimentalCapabilities;
   /**
    * Present if the server supports sending log messages to the client.
    */
@@ -51,6 +63,7 @@ export interface ServerCapabilities {
      */
     listChanged?: boolean;
   };
+  sampling?: object;
 }
 
 export interface McpClientState {
@@ -81,6 +94,7 @@ export interface McpClientState {
     serverId?: string;
     metadata?: ServerMetadata;
   };
+  onProgress?: (status: string) => void;
 }
 
 export interface McpContextType {
@@ -112,4 +126,24 @@ export interface McpContextType {
   ) => Promise<ToolCall>;
   /** Read a resource from a server */
   readResource: (serverId: string, resourceName: string) => Promise<unknown>;
+  /** Request sampling from a server */
+  requestSampling: (
+    serverId: string,
+    request: CreateMessageRequest["params"]
+  ) => Promise<CreateMessageResult>;
+  /** List of pending sampling requests */
+  pendingSampleRequests: Array<{
+    id: number;
+    serverId: string;
+    request: CreateMessageRequest["params"];
+    resolve: (result: CreateMessageResult) => void;
+    reject: (error: Error) => void;
+  }>;
+  /** Handle approving a sampling request */
+  handleApproveSampling: (
+    id: number,
+    response: CreateMessageResult
+  ) => Promise<void>;
+  /** Handle rejecting a sampling request */
+  handleRejectSampling: (id: number) => void;
 }

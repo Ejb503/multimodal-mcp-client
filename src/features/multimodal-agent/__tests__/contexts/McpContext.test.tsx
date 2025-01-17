@@ -1,32 +1,38 @@
-import { render, screen } from "@testing-library/react";
-import { McpProvider } from "@/contexts/McpContext";
 import { describe, it, expect, vi } from "vitest";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { render, screen } from "@testing-library/react";
+import { McpProvider } from "../../../../contexts/McpProvider";
+import { useContext } from "react";
+import { McpContext } from "../../../../contexts/McpContext";
+import React from "react";
 
-// Mock the MCP SDK
-vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
-  Client: vi.fn().mockImplementation(() => ({
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    listResources: vi.fn(),
-    listPrompts: vi.fn(),
-    listTools: vi.fn(),
-    selectPrompt: vi.fn(),
-    executeTool: vi.fn(),
-  })),
+const TestComponent = () => {
+  const context = useContext(McpContext);
+  if (!context) return null;
+  return (
+    <div>
+      <div>Active Clients: {context.activeClients.join(", ")}</div>
+      <div>
+        Connection Status: {context.clients.testServer?.connectionStatus}
+      </div>
+    </div>
+  );
+};
+
+// Mock the hooks used by McpProvider
+vi.mock("../../../../hooks/useMcpClient", () => ({
+  useMcpClient: () => ({
+    clients: {},
+    activeClients: [],
+    updateClientState: vi.fn(),
+    setupClientNotifications: vi.fn(),
+  }),
 }));
 
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
-  SSEClientTransport: vi.fn().mockImplementation(() => ({
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-    listResources: vi.fn(),
-    listPrompts: vi.fn(),
-    listTools: vi.fn(),
-    selectPrompt: vi.fn(),
-    executeTool: vi.fn(),
-  })),
+vi.mock("../../../../hooks/useMcpConnection", () => ({
+  useMcpConnection: () => ({
+    connectServer: vi.fn(),
+    disconnectServer: vi.fn(),
+  }),
 }));
 
 describe("McpProvider", () => {
@@ -36,18 +42,18 @@ describe("McpProvider", () => {
         <div>Test Child</div>
       </McpProvider>
     );
+
     expect(screen.getByText("Test Child")).toBeInTheDocument();
   });
 
   it("initializes with empty state", () => {
     render(
       <McpProvider>
-        <div>Test Child</div>
+        <TestComponent />
       </McpProvider>
     );
-    expect(Object.keys(vi.mocked(Client).mock.calls)).toHaveLength(0);
-    expect(Object.keys(vi.mocked(SSEClientTransport).mock.calls)).toHaveLength(
-      0
-    );
+
+    expect(screen.getByText(/^Active Clients:$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Connection Status:$/)).toBeInTheDocument();
   });
 });
