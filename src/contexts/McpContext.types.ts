@@ -112,7 +112,14 @@ export interface McpContextType {
   executePrompt: (
     serverId: string,
     params: { name: string; args: Record<string, unknown> }
-  ) => Promise<unknown>;
+  ) => Promise<
+    Prompt & {
+      _meta?: {
+        responseSchema?: Record<string, unknown>;
+        complexResponseSchema?: Record<string, unknown>;
+      };
+    }
+  >;
   /** List available resources on a server */
   listResources: (serverId: string) => Promise<void>;
   /** List available prompts on a server */

@@ -99,17 +99,17 @@ export function useGeminiProvider() {
     [addLog, providerConfig]
   );
 
-  // Register provider instance on mount
   useEffect(() => {
-    const instance = {
+    // Register the provider when the hook is mounted
+    registerProvider(geminiProvider, {
       id: geminiProvider.id,
       name: geminiProvider.name,
       executePrompt,
       isLoading,
       error,
-    };
+    });
 
-    registerProvider(geminiProvider, instance);
+    // Unregister when unmounted
     return () => {
       unregisterProvider(geminiProvider.id);
     };

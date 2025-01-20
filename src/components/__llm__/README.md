@@ -188,6 +188,39 @@ graph TD
 />
 ```
 
+### Modal Components
+
+#### PromptModal
+
+- Base modal component for all prompt-related interactions
+- Supports parameter input, validation, and execution
+- Features:
+  - Dynamic form generation from JSON Schema
+  - Validation error handling
+  - Loading states
+  - Preview/Result display
+  - Customizable actions
+- Usage:
+
+```tsx
+<PromptModal
+  isOpen={isOpen}
+  onClose={handleClose}
+  title="Execute Prompt"
+  description="Enter parameters to execute the prompt"
+  parameters={promptSchema}
+  parameterValues={values}
+  onParameterChange={handleChange}
+  validationErrors={errors}
+  requiredParameters={["name"]}
+  primaryAction={{
+    label: "Execute",
+    onClick: handleExecute,
+    isLoading: false,
+  }}
+/>
+```
+
 ## Styling Guidelines
 
 ### Tailwind CSS

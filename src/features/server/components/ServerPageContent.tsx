@@ -61,12 +61,24 @@ export function ServerPageContent({
             <CollapsibleSection title="Prompts" defaultExpanded={false}>
               <PromptsSection
                 prompts={prompts}
-                onExecutePrompt={actions.executePrompt}
+                onExecutePrompt={async (params) => {
+                  try {
+                    const response = await actions.executePrompt(
+                      params.name,
+                      params.arguments || {}
+                    );
+                    return { response };
+                  } catch (error) {
+                    return {
+                      response: "",
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    };
+                  }
+                }}
                 onGetPromptDetails={actions.getPromptDetails}
-                isLoading={isConnecting}
-                onFetchPrompts={actions.fetchPrompts}
-                hasListPromptsCapability={hasListPromptsCapability}
-                error={hasError}
+                isConnected={isConnected}
+                error={hasError ? "Failed to connect to server" : undefined}
               />
             </CollapsibleSection>
           )}

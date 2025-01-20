@@ -61,7 +61,6 @@
             },
             "metadata": {
                 "icon": "solar:notebook-line-duotone",
-                "color": "primary",
                 "description": "Systemprompt Notion MCP server"
             }
         }

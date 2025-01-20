@@ -13,8 +13,14 @@ const DEFAULT_CONFIG: LlmConfig = {
 
 export async function readLlmConfig(): Promise<LlmConfig> {
   try {
-    const config = await import("@config/llm.config.json");
-    return config.default || DEFAULT_CONFIG;
+    const response = await fetch("/api/config/llm");
+    if (!response.ok) {
+      throw new Error(
+        `Failed to read LLM configuration: ${response.statusText}`
+      );
+    }
+    const config = await response.json();
+    return config || DEFAULT_CONFIG;
   } catch (error) {
     console.error("Error reading LLM config:", error);
     return DEFAULT_CONFIG;

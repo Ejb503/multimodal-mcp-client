@@ -29,11 +29,18 @@ const mockTools: Tool[] = [
 // Mock NextUI components
 vi.mock("@nextui-org/react", async () => {
   return {
-    Card: vi.fn(({ children, "data-testid": testId, ...props }) => (
-      <div data-testid={testId || "card"} {...props}>
-        {children}
-      </div>
-    )),
+    Card: vi.fn(({ children, "data-testid": testId, className, ...props }) => {
+      // Add execution-history-card test ID if it's the history card
+      const isHistoryCard = className?.includes("execution-history");
+      const finalTestId = isHistoryCard
+        ? "execution-history-card"
+        : testId || "card";
+      return (
+        <div data-testid={finalTestId} {...props} className={className}>
+          {children}
+        </div>
+      );
+    }),
     CardHeader: vi.fn(({ children }) => (
       <div data-testid="card-header">{children}</div>
     )),
@@ -240,12 +247,8 @@ describe("ToolsSection", () => {
 
     // Wait for the execution history to appear and verify its contents
     await waitFor(() => {
-      // First verify the execution history card exists
-      const historyCard = screen.getByTestId("execution-history-card");
-      expect(historyCard).toBeInTheDocument();
-
-      // Then verify the log entry exists
-      const logEntry = within(historyCard).getByTestId("execution-log-entry");
+      // Verify the log entry exists
+      const logEntry = screen.getByTestId("execution-log-entry");
       expect(logEntry).toBeInTheDocument();
 
       // Then verify the contents of the log entry

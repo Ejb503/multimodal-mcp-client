@@ -7,6 +7,9 @@ import type {
   McpClientState,
   McpContextType,
 } from "../../../contexts/McpContext.types";
+import { McpDataProvider } from "../../../contexts/McpDataContext";
+import { GlobalLlmProvider } from "../../../contexts/LlmProviderContext";
+import { LlmRegistryProvider } from "../../../features/llm-registry/contexts/LlmRegistryContext";
 
 // Mock modules
 const mockNavigate = vi.fn();
@@ -71,6 +74,20 @@ const mockConfig = {
 
 vi.mock("../../../config/mcp.config.json", () => ({
   default: mockConfig,
+}));
+
+vi.mock("../../../contexts/McpDataContext", () => ({
+  McpDataProvider: ({ children }: { children: React.ReactNode }) => children,
+  useMcpData: () => ({
+    mcpData: {
+      mcpServers: mockConfig.mcpServers,
+      available: {},
+      defaults: mockConfig.defaults,
+    },
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
 }));
 
 const wrapper = ({ children }: { children: ReactNode }) => {
@@ -143,7 +160,15 @@ const wrapper = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <McpContext.Provider value={mockContext}>{children}</McpContext.Provider>
+    <LlmRegistryProvider>
+      <GlobalLlmProvider>
+        <McpDataProvider>
+          <McpContext.Provider value={mockContext}>
+            {children}
+          </McpContext.Provider>
+        </McpDataProvider>
+      </GlobalLlmProvider>
+    </LlmRegistryProvider>
   );
 };
 
@@ -168,8 +193,9 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const mainSection = result.current.sections.find((s) => s.title === "Main");
-    expect(mainSection?.items).toHaveLength(2);
+    expect(mainSection?.items).toHaveLength(3);
     expect(mainSection?.items.map((i) => i.label)).toEqual([
+      "Control Center",
       "Agents",
       "Create Agent",
     ]);

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.13] - 2025-01-20
+
+### Added
+
+- Added new server management components (AvailableServerCard, McpServerCard, UserInfoCard)
+- Added ServerConnectionStatus component for improved connection state visualization
+- Added environment configuration support with env.d.ts and utils
+- Added new ControlPage component for centralized server control
+- Added ServerDetails section for enhanced server information display
+
+### Changed
+
+- Enhanced MCP context management with new McpDataContext
+- Improved server and prompt handling architecture
+- Updated modal components and tests
+- Refined sidebar implementation and testing
+- Enhanced configuration handling in multiple components
+
+### Removed
+
+- Removed deprecated prompt and parameter hooks
+- Removed outdated test files
+
 ## [0.3.12] - 2025-01-15
 
 ### Added

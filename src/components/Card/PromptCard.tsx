@@ -1,15 +1,9 @@
-// Remove React import since it's not needed
+import type { Prompt as McpPrompt } from "@modelcontextprotocol/sdk/types.js";
 import { ToolCard } from "@/components/Card";
 import { ExecuteButton, Button } from "@/components/Button";
 
-interface Prompt {
-  name: string;
-  description?: string;
-  type?: string;
-}
-
 interface PromptCardProps {
-  prompt: Prompt;
+  prompt: McpPrompt;
   onExecute: () => void;
   onView: () => void;
   isLoading?: boolean;
@@ -26,7 +20,7 @@ export function PromptCard({
       <ToolCard
         name={prompt.name}
         description={prompt.description}
-        type={prompt.type || "Prompt"}
+        type="Prompt"
       />
       <div className="flex gap-2 mt-2">
         <ExecuteButton

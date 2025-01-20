@@ -12,6 +12,7 @@ import type {
   ServerCapabilities,
 } from "../contexts/McpContext.types";
 import { getServerConfig } from "../../config/server.config";
+import { useMcpData } from "@/contexts/McpDataContext";
 
 interface ServerInfo {
   name?: unknown;
@@ -32,7 +33,18 @@ export function useMcpConnection(
     serverId: string
   ) => void
 ) {
+  const { mcpData } = useMcpData();
+
   const connectServer = async (serverId: string) => {
+    if (!mcpData) {
+      throw new Error("MCP data not available");
+    }
+
+    // Verify server exists in config
+    if (!mcpData.mcpServers[serverId]) {
+      throw new Error(`Server ${serverId} not found in MCP configuration`);
+    }
+
     try {
       console.log("Debug - Connecting server:", {
         serverId,
@@ -204,7 +216,7 @@ export function useMcpConnection(
 
         // Get server config with metadata
         const metadata = serverInfo.metadata as ServerMetadata | undefined;
-        const serverConfig = getServerConfig(serverId, metadata, true);
+        const serverConfig = getServerConfig(serverId, mcpData, metadata, true);
 
         // Only NOW update the client state as connected with all the data
         updateClientState(serverId, {

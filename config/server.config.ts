@@ -1,11 +1,6 @@
 import { SidebarItem } from "@/components/sidebar/types";
-import mcpConfig from "./mcp.config.json";
-import {
-  McpConfig,
-  ServerMetadata,
-  SSEServerConfig,
-  StdioServerConfig,
-} from "./types";
+import { ServerMetadata, StdioServerConfig } from "./types";
+import { McpData } from "@/contexts/McpDataContext";
 import * as os from "os";
 import * as path from "path";
 
@@ -37,48 +32,21 @@ function resolveServerConfig(config: StdioServerConfig): StdioServerConfig {
     ...config,
     command: resolveEnvVars(config.command),
     args: config.args.map(resolveEnvVars),
-    env: config.env
-      ? Object.fromEntries(
-          Object.entries(config.env).map(([key, value]) => [
-            key,
-            resolveEnvVars(value),
-          ])
-        )
-      : undefined,
+    env: config.env,
+    metadata: config.metadata,
   };
 }
 
 /**
- * Determines the server type based on its configuration
- */
-export function getServerType(id: string, config: McpConfig): "sse" | "stdio" {
-  // Check if this server ID exists in SSE configs
-  if (config.sse && id in config.sse) {
-    return "sse";
-  }
-  // Check if this server ID exists in stdio configs
-  if (config.mcpServers && id in config.mcpServers) {
-    return "stdio";
-  }
-  // Default to stdio if not found (this maintains backward compatibility)
-  return "stdio";
-}
-
-/**
- * Gets the raw server configuration from the MCP config
+ * Gets the raw server configuration from the MCP data
  */
 export function getRawServerConfig(
   id: string,
-  config: McpConfig
-): SSEServerConfig | StdioServerConfig | undefined {
-  const serverType = getServerType(id, config);
-  const serverConfig =
-    serverType === "sse" ? config.sse?.[id] : config.mcpServers[id];
+  mcpData: McpData
+): StdioServerConfig | undefined {
+  const serverConfig = mcpData.mcpServers[id];
   if (!serverConfig) return undefined;
-
-  return "url" in serverConfig
-    ? serverConfig
-    : resolveServerConfig(serverConfig);
+  return resolveServerConfig(serverConfig);
 }
 
 /**
@@ -86,13 +54,12 @@ export function getRawServerConfig(
  */
 export function buildServerMetadata(
   id: string,
-  config: McpConfig,
+  mcpData: McpData,
   serverMetadata?: ServerMetadata,
   isConnected: boolean = false
 ): ServerMetadata {
-  const serverType = getServerType(id, config);
-  const configMetadata = getRawServerConfig(id, config)?.metadata;
-  const typeDefaults = config.defaults.serverTypes[serverType];
+  const configMetadata = getRawServerConfig(id, mcpData)?.metadata;
+  const typeDefaults = mcpData.defaults.serverTypes.stdio;
 
   if (isConnected) {
     return {
@@ -105,11 +72,11 @@ export function buildServerMetadata(
   return {
     ...typeDefaults,
     ...configMetadata,
-    color: config.defaults.unconnected.color,
+    color: mcpData.defaults.unconnected.color,
     icon:
       configMetadata?.icon ||
       typeDefaults.icon ||
-      config.defaults.unconnected.icon,
+      mcpData.defaults.unconnected.icon,
     name: serverMetadata?.name,
   };
 }
@@ -127,11 +94,18 @@ export function formatServerLabel(id: string, name?: string): string {
  */
 export function getServerConfig(
   id: string,
+  mcpData: McpData,
   serverMetadata?: ServerMetadata,
   isConnected: boolean = false
 ): SidebarItem {
-  const config = mcpConfig as McpConfig;
-  const metadata = buildServerMetadata(id, config, serverMetadata, isConnected);
+  if (!mcpData) throw new Error("MCP data not available");
+
+  const metadata = buildServerMetadata(
+    id,
+    mcpData,
+    serverMetadata,
+    isConnected
+  );
 
   return {
     key: `server-${id}`,
@@ -148,20 +122,21 @@ export function getServerConfig(
 /**
  * Gets configurations for all servers
  */
-export function getServerConfigs(): SidebarItem[] {
-  const config = mcpConfig as McpConfig;
-  return Object.keys(config.mcpServers).map((id) => getServerConfig(id));
+export function getServerConfigs(mcpData: McpData): SidebarItem[] {
+  if (!mcpData) throw new Error("MCP data not available");
+  return Object.keys(mcpData.mcpServers).map((id) =>
+    getServerConfig(id, mcpData)
+  );
 }
 
 /**
  * Gets a mapping of server IDs to their display names
  */
-export function getServerNames(): Record<string, string> {
-  const config = mcpConfig as McpConfig;
-  const serverIds = Object.keys(config.mcpServers);
-
+export function getServerNames(mcpData: McpData): Record<string, string> {
+  if (!mcpData) throw new Error("MCP data not available");
+  const serverIds = Object.keys(mcpData.mcpServers);
   return serverIds.reduce((names, id) => {
-    names[id] = getServerConfig(id).label;
+    names[id] = getServerConfig(id, mcpData).label;
     return names;
   }, {} as Record<string, string>);
 }

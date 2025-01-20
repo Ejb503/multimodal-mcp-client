@@ -2,12 +2,18 @@ import { SidebarSection, SidebarItem } from "./types";
 import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { McpContext } from "../../contexts/McpContext";
-import mcpConfig from "../../../config/mcp.config.json";
+import { useMcpData } from "../../contexts/McpDataContext";
+
+type ServerType = "stdio" | "sse";
 
 export function useSidebarItems() {
   const navigate = useNavigate();
   const context = useContext(McpContext);
+  const { mcpData } = useMcpData();
+
   if (!context) throw new Error("McpContext must be used within McpProvider");
+  if (!mcpData) return { sections: [], handleItemClick: () => {} };
+
   const { clients } = context;
 
   const handleItemClick = (href: string | undefined) => {
@@ -18,14 +24,15 @@ export function useSidebarItems() {
 
   // Get server items with current connection state
   const serverItems: SidebarItem[] = Object.entries(
-    mcpConfig.mcpServers || {}
+    mcpData.mcpServers || {}
   ).map(([id, config]) => {
     const clientState = clients[id];
     const isConnected = clientState?.connectionStatus === "connected";
-    const type = clientState?.serverType || "stdio";
+    const type = (clientState?.serverType || "stdio") as ServerType;
 
     // Get the appropriate metadata based on connection state and configuration
-    const defaultMetadata = mcpConfig.defaults.serverTypes?.[type] || {};
+    const defaultMetadata =
+      type === "stdio" ? mcpData.defaults.serverTypes.stdio : {};
 
     const metadata =
       isConnected &&
@@ -36,7 +43,7 @@ export function useSidebarItems() {
             ...defaultMetadata,
             ...config.metadata,
           }
-        : mcpConfig.defaults.unconnected;
+        : mcpData.defaults.unconnected;
 
     return {
       key: id,
@@ -54,11 +61,19 @@ export function useSidebarItems() {
       title: "Main",
       items: [
         {
+          key: "control",
+          label: "Control Center",
+          icon: "solar:server-square-line-duotone",
+          description: "Manage MCP servers and modules",
+          href: "/control",
+          color: "primary",
+        },
+        {
           key: "home",
           label: "Agents",
           icon: "solar:programming-line-duotone",
           description: "View and manage your agents",
-          href: "/",
+          href: "/agents",
           color: "primary",
         },
         {

@@ -5,7 +5,8 @@ import type {
   TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useState } from "react";
-import { useLlmPrompt } from "@/features/server/hooks/useLlmPrompt";
+import { useGlobalLlm } from "@/contexts/LlmProviderContext";
+import { McpMeta } from "@/types/mcp";
 
 interface SamplingModalProps {
   isOpen: boolean;
@@ -22,8 +23,9 @@ export function SamplingModal({
   onApprove,
   onReject,
 }: SamplingModalProps) {
-  const { execute, isLoading } = useLlmPrompt();
+  const llmProvider = useGlobalLlm();
   const [progress] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<CreateMessageResult>({
     role: "assistant",
     content: {
@@ -34,46 +36,37 @@ export function SamplingModal({
   });
 
   const handleSubmit = async () => {
-    console.log("Request in SamplingModal:", request);
     try {
-      const params: Record<string, string> = {};
-
-      if (typeof request.temperature === "number") {
-        params.temperature = request.temperature.toString();
-      }
-      if (typeof request.maxTokens === "number") {
-        params.maxTokens = request.maxTokens.toString();
-      }
-      if (request.stopSequences?.length) {
-        params.stopSequences = request.stopSequences.join(",");
-      }
-
-      const result = await execute(
-        {
-          name: "sampling",
-          messages: request.messages,
-          _meta: {
-            ...request._meta,
-            progress: true,
-          },
+      setIsLoading(true);
+      // Execute with LLM provider
+      const result = await llmProvider.executePrompt({
+        name: "sampling",
+        messages: request.messages,
+        params: {
+          temperature: request.temperature,
+          maxTokens: request.maxTokens,
+          stopSequences: request.stopSequences,
         },
-        params
-      );
+        _meta: request._meta as McpMeta,
+      });
 
-      const updatedResponse: CreateMessageResult = {
+      // Create response object
+      const response: CreateMessageResult = {
         role: "assistant",
         content: {
           type: "text",
-          text: result as string,
+          text: result,
         },
-        model: response.model,
+        model: "mcp-sampling",
       };
 
-      setResponse(updatedResponse);
-      onApprove(updatedResponse);
-      onClose();
+      // Update local state and approve
+      setResponse(response);
+      onApprove(response);
     } catch (error) {
       console.error("Failed to execute sampling:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -149,7 +142,7 @@ export function SamplingModal({
         label: "Execute",
         loadingLabel: "Executing...",
         onClick: handleSubmit,
-        isLoading: isLoading,
+        isLoading,
       }}
     />
   );

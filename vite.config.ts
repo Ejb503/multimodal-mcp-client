@@ -79,6 +79,48 @@ function configWriterPlugin() {
         res.statusCode = 200; // Return empty array on error instead of 500
         res.end(JSON.stringify({ agents: [] }));
       }
+    } else if (req.method === "GET" && req.url === "/api/config/llm") {
+      try {
+        const configPath = path.resolve(__dirname, "config/llm.config.json");
+        const configExists = await fs
+          .access(configPath)
+          .then(() => true)
+          .catch(() => false);
+
+        if (!configExists) {
+          res.statusCode = 200;
+          res.end(
+            JSON.stringify({
+              provider: "gemini",
+              config: {
+                apiKey: "",
+                model: "gemini-2.0-flash-exp",
+                temperature: 0.7,
+                maxTokens: 1000,
+              },
+            })
+          );
+          return;
+        }
+
+        const configData = await fs.readFile(configPath, "utf-8");
+        res.statusCode = 200;
+        res.end(configData);
+      } catch (error) {
+        console.error("Error reading config:", error);
+        res.statusCode = 200;
+        res.end(
+          JSON.stringify({
+            provider: "gemini",
+            config: {
+              apiKey: "",
+              model: "gemini-2.0-flash-exp",
+              temperature: 0.7,
+              maxTokens: 1000,
+            },
+          })
+        );
+      }
     } else if (req.method === "POST" && req.url === "/api/update-env") {
       try {
         const chunks = [];

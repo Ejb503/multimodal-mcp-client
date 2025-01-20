@@ -24,9 +24,14 @@ export function LlmRegistryProvider({ children }: Props) {
   const [instances, setInstances] = useState<Map<string, LlmProviderInstance>>(
     new Map()
   );
-  const [activeProvider, setActiveProvider] = useState<string | null>(null);
+  const [activeProvider, setActiveProvider] = useState<string | null>("gemini");
   const [providerConfig, setProviderConfig] = useState<Record<string, unknown>>(
-    {}
+    {
+      apiKey: "",
+      model: "gemini-2.0-flash-exp",
+      temperature: 0.7,
+      maxTokens: 1000,
+    }
   );
 
   // Load configuration from llm.json on startup
@@ -48,6 +53,7 @@ export function LlmRegistryProvider({ children }: Props) {
 
   const registerProvider = useCallback(
     (config: LlmProviderConfig, instance: LlmProviderInstance) => {
+      console.log("Registering provider:", config.id);
       setProviders((prev) => {
         if (prev.some((p) => p.id === config.id)) {
           return prev;
