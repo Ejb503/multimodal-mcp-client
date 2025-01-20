@@ -4,7 +4,6 @@ import {
   CreateMessageRequestSchema,
   CreateMessageRequest,
   CreateMessageResult,
-  CreateMessageResultSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type {
   McpClientState,
@@ -167,11 +166,6 @@ export function useMcpConnection(
 
       // Check connection by attempting to get server info
       try {
-        console.log("Debug - Connection established, verifying server info:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-        });
-
         // Get server info and capabilities
         const serverInfo = client.getServerVersion() as ServerInfo;
         if (!serverInfo || typeof serverInfo !== "object") {
@@ -180,26 +174,12 @@ export function useMcpConnection(
 
         const capabilities =
           client.getServerCapabilities() as ServerCapabilities;
-        console.log("Debug - Server capabilities:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-          capabilities,
-        });
-
         // Fetch available tools, prompts, and resources
         let tools: McpClientState["tools"] = [];
         let prompts: McpClientState["prompts"] = [];
         let resources: McpClientState["resources"] = [];
 
         if (capabilities && typeof capabilities === "object") {
-          console.log("Debug - Fetching server resources:", {
-            serverId,
-            timestamp: new Date().toISOString(),
-            hasTools: "tools" in capabilities,
-            hasPrompts: "prompts" in capabilities,
-            hasResources: "resources" in capabilities,
-          });
-
           if ("tools" in capabilities) {
             const result = await client.listTools();
             tools = result.tools;
@@ -234,14 +214,6 @@ export function useMcpConnection(
             metadata,
           },
           serverConfig,
-        });
-
-        console.log("Debug - Server fully connected with capabilities:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-          toolCount: tools.length,
-          promptCount: prompts.length,
-          resourceCount: resources.length,
         });
       } catch (error) {
         console.error("Debug - Connection verification failed:", {

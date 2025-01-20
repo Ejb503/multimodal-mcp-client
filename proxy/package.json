@@ -13,6 +13,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "eventsource": "^3.0.2",
     "express": "^4.21.2",
     "spawn-rx": "^5.1.1"

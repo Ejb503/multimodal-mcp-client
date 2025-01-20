@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { McpContext } from "../../contexts/McpContext";
 import { useMcpData } from "../../contexts/McpDataContext";
+import { McpServerConfig } from "../../types";
 
-type ServerType = "stdio" | "sse";
+type SidebarItemColor = "primary" | "success" | "warning" | "secondary";
 
 export function useSidebarItems() {
   const navigate = useNavigate();
@@ -17,44 +18,57 @@ export function useSidebarItems() {
   const { clients } = context;
 
   const handleItemClick = (href: string | undefined) => {
-    if (href) {
-      navigate(href);
-    }
+    if (href) navigate(href);
   };
 
-  // Get server items with current connection state
-  const serverItems: SidebarItem[] = Object.entries(
-    mcpData.mcpServers || {}
-  ).map(([id, config]) => {
-    const clientState = clients[id];
-    const isConnected = clientState?.connectionStatus === "connected";
-    const type = (clientState?.serverType || "stdio") as ServerType;
+  const getServerItems = (
+    servers: Record<string, McpServerConfig>,
+    isCustom: boolean = false
+  ): SidebarItem[] => {
+    return Object.entries(servers || {}).map(([id, config]) => {
+      const clientState = clients[id];
+      const isConnected = clientState?.connectionStatus === "connected";
 
-    // Get the appropriate metadata based on connection state and configuration
-    const defaultMetadata =
-      type === "stdio" ? mcpData.defaults.serverTypes.stdio : {};
+      const metadata =
+        isConnected && config?.metadata
+          ? {
+              icon:
+                config.metadata.icon ||
+                mcpData.defaults?.serverTypes?.stdio?.icon ||
+                "solar:server-square-line-duotone",
+              color:
+                config.metadata.color ||
+                mcpData.defaults?.serverTypes?.stdio?.color ||
+                "secondary",
+              description:
+                config.metadata.description ||
+                mcpData.defaults?.serverTypes?.stdio?.description ||
+                "Local stdio-based MCP server",
+            }
+          : {
+              icon:
+                mcpData.defaults?.unconnected?.icon ||
+                "solar:server-square-line-duotone",
+              color: mcpData.defaults?.unconnected?.color || "secondary",
+              description:
+                mcpData.defaults?.unconnected?.description ||
+                "Disconnected server",
+            };
 
-    const metadata =
-      isConnected &&
-      config &&
-      typeof config === "object" &&
-      "metadata" in config
-        ? {
-            ...defaultMetadata,
-            ...config.metadata,
-          }
-        : mcpData.defaults.unconnected;
-
-    return {
-      key: id,
-      label: id,
-      icon: metadata.icon,
-      description: metadata.description || `${id} server`,
-      href: `/servers/${id}`,
-      color: metadata.color,
-      serverId: id,
-    } as SidebarItem;
-  });
+      return {
+        key: id,
+        label: id,
+        icon: metadata.icon,
+        description: metadata.description || `${id} server`,
+        href: `/servers/${id}`,
+        color: (isConnected
+          ? "success"
+          : metadata.color || "secondary") as SidebarItemColor,
+        serverId: id,
+        serverType: isCustom ? "custom" : "core",
+      };
+    });
+  };
 
   const sections: SidebarSection[] = [
     {
@@ -86,45 +100,46 @@ export function useSidebarItems() {
         },
       ],
     },
-    {
-      title: "Servers",
-      items: serverItems,
-    },
-    {
-      title: "Settings",
-      items: [
-        {
-          key: "logs",
-          label: "Logs",
-          icon: "solar:document-text-line-duotone",
-          description: "View system logs",
-          href: "/logs",
-          color: "primary",
-        },
-        {
-          key: "settings",
-          label: "Settings",
-          icon: "solar:settings-line-duotone",
-          description: "Manage your preferences",
-          href: "/settings",
-          color: "primary",
-        },
-      ],
-    },
-    {
-      title: "Help",
-      items: [
-        {
-          key: "docs",
-          label: "Documentation",
-          icon: "solar:book-line-duotone",
-          description: "View MCP documentation",
-          href: "https://systemprompt.io/docs/mcp-client",
-          color: "primary",
-        },
-      ],
-    },
   ];
+
+  const coreServers = getServerItems(mcpData.mcpServers);
+  const customServers = getServerItems(mcpData.customServers || {}, true);
+
+  if (coreServers.length > 0) {
+    sections.push({ title: "Core Servers", items: coreServers });
+  }
+
+  if (customServers.length > 0) {
+    sections.push({ title: "Custom Servers", items: customServers });
+  }
+
+  sections.push({
+    title: "Settings",
+    items: [
+      {
+        key: "settings",
+        label: "Settings",
+        icon: "solar:settings-line-duotone",
+        description: "Configure MCP settings",
+        href: "/settings",
+        color: "primary",
+      },
+    ],
+  });
+
+  sections.push({
+    title: "Help",
+    items: [
+      {
+        key: "help",
+        label: "Help",
+        icon: "solar:info-circle-line-duotone",
+        description: "Get help with MCP",
+        href: "/help",
+        color: "primary",
+      },
+    ],
+  });
 
   return { sections, handleItemClick };
 }

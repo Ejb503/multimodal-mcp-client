@@ -4,13 +4,11 @@ import { UserInfoCard } from "../components/Card/UserInfoCard";
 import { McpServerCard } from "../components/Card/McpServerCard";
 import { AvailableServerCard } from "../components/Card/AvailableServerCard";
 import { StatusCard } from "../components/Card/StatusCard";
-import { ThreeColumnLayout, GridLayout } from "../components/Layout/GridLayout";
+import { GridLayout } from "../components/Layout/GridLayout";
 import { Card, CardBody } from "@nextui-org/react";
 
 export default function ControlPage() {
   const { user, mcpData, isLoading, error } = useMcpData();
-
-  console.log("ControlPage render:", { user, mcpData, isLoading, error });
 
   if (isLoading) {
     return (
@@ -53,7 +51,11 @@ export default function ControlPage() {
   };
 
   const activeServers = Object.entries(mcpData.mcpServers);
-  const installedServerIds = new Set(Object.keys(mcpData.mcpServers));
+  const activeCustomServers = Object.entries(mcpData.customServers || {});
+  const installedServerIds = new Set([
+    ...Object.keys(mcpData.mcpServers),
+    ...Object.keys(mcpData.customServers || {}),
+  ]);
 
   // Sort available servers: installed first, then alphabetically
   const availableServers = Object.entries(mcpData.available).sort(
@@ -66,6 +68,7 @@ export default function ControlPage() {
       return isInstalledA ? -1 : 1;
     }
   );
+
   return (
     <div className="flex flex-col space-y-6">
       {/* Full-width header section */}
@@ -91,10 +94,12 @@ export default function ControlPage() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-medium">Active Servers</h2>
               <span className="text-default-500">
-                {activeServers.length} servers running
+                {activeServers.length + activeCustomServers.length} servers
+                active
               </span>
             </div>
-            {activeServers.length === 0 ? (
+
+            {activeServers.length === 0 && activeCustomServers.length === 0 ? (
               <StatusCard
                 status="warning"
                 title="No Active Servers"
@@ -103,31 +108,67 @@ export default function ControlPage() {
               />
             ) : (
               <>
-                {activeServers.map(([key, server]) => {
-                  const availableInfo = mcpData.available[key];
-                  return (
-                    <McpServerCard
-                      key={key}
-                      serverId={key}
-                      command={server.command}
-                      args={server.args}
-                      env={server.env}
-                      additionalInfo={
-                        availableInfo
-                          ? {
-                              title: availableInfo.title,
-                              description: availableInfo.description,
-                              content: availableInfo.content,
-                              github_link: availableInfo.github_link,
-                              npm_link: availableInfo.npm_link,
-                              environment_variables:
-                                availableInfo.environment_variables,
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })}
+                {activeServers.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium mb-4">Core Servers</h3>
+                    {activeServers.map(([key, server]) => {
+                      const availableInfo = mcpData.available[key];
+                      return (
+                        <McpServerCard
+                          key={key}
+                          serverId={key}
+                          command={server.command}
+                          args={server.args}
+                          env={server.env}
+                          additionalInfo={
+                            availableInfo
+                              ? {
+                                  title: availableInfo.title,
+                                  description: availableInfo.description,
+                                  content: availableInfo.content,
+                                  github_link: availableInfo.github_link,
+                                  npm_link: availableInfo.npm_link,
+                                  environment_variables:
+                                    availableInfo.environment_variables,
+                                }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+
+                {activeCustomServers.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Custom Servers</h3>
+                    {activeCustomServers.map(([key, server]) => {
+                      const availableInfo = mcpData.available[key];
+                      return (
+                        <McpServerCard
+                          key={key}
+                          serverId={key}
+                          command={server.command}
+                          args={server.args}
+                          env={server.env}
+                          additionalInfo={
+                            availableInfo
+                              ? {
+                                  title: availableInfo.title,
+                                  description: availableInfo.description,
+                                  content: availableInfo.content,
+                                  github_link: availableInfo.github_link,
+                                  npm_link: availableInfo.npm_link,
+                                  environment_variables:
+                                    availableInfo.environment_variables,
+                                }
+                              : undefined
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
           </CardBody>
@@ -171,6 +212,31 @@ export default function ControlPage() {
                 ))}
               </GridLayout>
             )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <div className="bg-default-50 p-4 rounded-lg font-mono text-sm">
+              <pre className="whitespace-pre-wrap">
+                {`{
+  "mcpServers": {
+    "coreServer": {
+      "command": "path/to/command",
+      "args": ["arg1", "arg2"],
+      "env": ["ENV_VAR1", "ENV_VAR2"]
+    }
+  },
+  "customServers": {
+    "customServer": {
+      "command": "path/to/custom/command",
+      "args": ["arg1", "arg2"],
+      "env": ["CUSTOM_ENV_VAR1", "CUSTOM_ENV_VAR2"]
+    }
+  }
+}`}
+              </pre>
+            </div>
           </CardBody>
         </Card>
       </div>

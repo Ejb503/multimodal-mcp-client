@@ -1,7 +1,6 @@
 import { createContext, FC, ReactNode, useContext, useEffect } from "react";
 import { useLiveAPI, UseLiveAPIResults } from "../hooks/use-live-api";
 import { useMcp } from "@/contexts/McpContext";
-import llmConfig from "@config/llm.config.json";
 
 type LiveAPIContextType = UseLiveAPIResults;
 
@@ -12,9 +11,9 @@ export type LiveAPIProviderProps = {
 };
 
 export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
-  const API_KEY = llmConfig.config.apiKey;
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
   if (!API_KEY) {
-    throw new Error("API key not found in config/llm.config.json");
+    throw new Error("VITE_GEMINI_API_KEY not found in environment variables");
   }
 
   const { clients, executeTool } = useMcp();

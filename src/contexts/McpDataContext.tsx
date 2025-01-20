@@ -33,6 +33,7 @@ interface ServerDefaults {
 
 export interface McpData {
   mcpServers: Record<string, StdioServerConfig>;
+  customServers?: Record<string, StdioServerConfig>;
   available: Record<string, AvailableServer>;
   defaults: ServerDefaults;
 }
@@ -47,13 +48,31 @@ interface McpDataContextType {
 
 const McpDataContext = createContext<McpDataContextType | null>(null);
 
-const API_KEY = import.meta.env.VITE_SYSTEMPROMPT_API_KEY;
+const fetchUserData = async () => {
+  const response = await fetch("/v1/user/mcp", {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error);
+  }
+  return data;
+};
 
-if (!API_KEY) {
-  throw new Error(
-    "VITE_SYSTEMPROMPT_API_KEY is not defined in environment variables"
-  );
-}
+const fetchMcpData = async () => {
+  const response = await fetch("/v1/mcp", {
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await response.json();
+  if (data.error) {
+    throw new Error(data.error);
+  }
+  return data;
+};
 
 export function McpDataProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<McpUser | null>(null);
@@ -65,61 +84,35 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
-      console.log("Fetching with API key:", API_KEY);
-
-      // Fetch user data
-      const userResponse = await fetch("http://localhost/v1/user/mcp", {
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": API_KEY,
-        },
-      });
-
-      if (!userResponse.ok) {
-        throw new Error(
-          `Failed to fetch user data: ${userResponse.statusText}`
-        );
-      }
-
-      const userData = await userResponse.json();
+      // Fetch user data first
+      const userData = await fetchUserData();
       console.log("User data received:", userData);
       setUser(userData);
 
-      // Fetch MCP data
-      const mcpResponse = await fetch("http://localhost/v1/mcp", {
-        headers: {
-          "Content-Type": "application/json",
-          "api-key": API_KEY,
-        },
-      });
+      // Only fetch MCP data if we have valid user data
+      if (userData) {
+        const mcpData = await fetchMcpData();
+        console.log("MCP data received:", mcpData);
 
-      if (!mcpResponse.ok) {
-        throw new Error(`Failed to fetch MCP data: ${mcpResponse.statusText}`);
+        // Update mcp.config.json with the server configuration
+        try {
+          await fetch("/v1/config/mcp", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              mcpServers: mcpData.mcpServers,
+              customServers: mcpData.customServers || {},
+            }),
+          });
+          console.log("Successfully updated mcp.config.json");
+        } catch (configError) {
+          console.error("Failed to update mcp.config.json:", configError);
+        }
+
+        setMcpData(mcpData);
       }
-
-      const mcpData = await mcpResponse.json();
-      console.log("MCP data received:", mcpData);
-
-      // Add default server metadata
-      const defaults: ServerDefaults = {
-        serverTypes: {
-          stdio: {
-            icon: "solar:server-minimalistic-line-duotone",
-            color: "primary",
-            description: "Local stdio-based MCP server",
-          },
-        },
-        unconnected: {
-          icon: "solar:server-square-line-duotone",
-          color: "secondary",
-          description: "Remote MCP server (not connected)",
-        },
-      };
-
-      setMcpData({
-        ...mcpData,
-        defaults,
-      });
     } catch (err) {
       console.error("Error fetching data:", err);
       setError(err instanceof Error ? err : new Error("An error occurred"));

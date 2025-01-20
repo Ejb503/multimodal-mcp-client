@@ -1,4 +1,9 @@
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { McpHandlers } from "./handlers/mcpHandlers.js";
+import { ConfigHandlers } from "./handlers/configHandlers.js";
+import { TransportHandlers } from "./handlers/transportHandlers.js";
+import { defaults } from "./config/defaults.js";
+import type { McpConfig } from "./types/index.js";
 
 export default function mcpProxy({
   transportToClient,
@@ -44,4 +49,19 @@ export default function mcpProxy({
 
   transportToClient.onerror = onerror;
   transportToServer.onerror = onerror;
+}
+
+export class McpProxy {
+  private mcpHandlers: McpHandlers;
+  private configHandlers: ConfigHandlers;
+  private transportHandlers: TransportHandlers;
+
+  constructor(config: McpConfig) {
+    // Ensure defaults are properly initialized
+    config.defaults = config.defaults || defaults;
+
+    this.mcpHandlers = new McpHandlers(config);
+    this.configHandlers = new ConfigHandlers(config);
+    this.transportHandlers = new TransportHandlers(config);
+  }
 }

@@ -1,23 +1,4 @@
 {
-    "defaults": {
-        "serverTypes": {
-            "sse": {
-                "icon": "solar:server-square-cloud-line-duotone",
-                "color": "primary",
-                "description": "Remote SSE-based MCP server"
-            },
-            "stdio": {
-                "icon": "solar:server-minimalistic-line-duotone",
-                "color": "primary",
-                "description": "Local stdio-based MCP server"
-            }
-        },
-        "unconnected": {
-            "icon": "solar:server-square-line-duotone",
-            "color": "secondary",
-            "description": "Remote MCP server (not connected)"
-        }
-    },
     "mcpServers": {
         "systemprompt-core": {
             "command": "npx",
@@ -25,9 +6,9 @@
                 "-y",
                 "systemprompt-agent-server"
             ],
-            "env": {
-                "SYSTEMPROMPT_API_KEY": ""
-            },
+            "env": [
+                "SYSTEMPROMPT_API_KEY"
+            ],
             "metadata": {
                 "icon": "solar:programming-line-duotone",
                 "color": "success",
@@ -40,10 +21,9 @@
                 "-y",
                 "systemprompt-mcp-notion"
             ],
-            "env": {
-                "NOTION_API_KEY": "xxx",
-                "SYSTEMPROMPT_API_KEY": "xxx"
-            },
+            "env": [
+                "SYSTEMPROMPT_API_KEY"
+            ],
             "metadata": {
                 "icon": "solar:programming-line-duotone",
                 "color": "success",
@@ -55,10 +35,9 @@
             "args": [
                 "C:\\Users\\ejb50\\Websites\\mcp-server-systemprompt-notion\\build\\index.js"
             ],
-            "env": {
-                "NOTION_API_KEY": "xxx",
-                "SYSTEMPROMPT_API_KEY": "xxx"
-            },
+            "env": [
+                "SYSTEMPROMPT_API_KEY"
+            ],
             "metadata": {
                 "icon": "solar:notebook-line-duotone",
                 "description": "Systemprompt Notion MCP server"

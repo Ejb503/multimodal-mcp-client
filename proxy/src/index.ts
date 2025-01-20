@@ -7,6 +7,7 @@ import { EventSource } from "eventsource";
 import { parseArgs } from "node:util";
 import type { McpConfig } from "./types/index.js";
 import { ProxyServer } from "./server.js";
+import { defaults } from "./config/defaults.js";
 
 // Polyfill EventSource for SSE client in Node.js
 declare global {
@@ -21,6 +22,9 @@ const __dirname = dirname(__filename);
 // Load configuration
 const configPath = join(__dirname, "../../config/mcp.config.json");
 const mcpConfig = JSON.parse(readFileSync(configPath, "utf-8")) as McpConfig;
+
+// Ensure defaults are properly initialized
+mcpConfig.defaults = mcpConfig.defaults || defaults;
 
 // Parse command line arguments
 const { values } = parseArgs({

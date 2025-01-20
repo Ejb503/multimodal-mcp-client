@@ -11,9 +11,17 @@ const DEFAULT_CONFIG: LlmConfig = {
   },
 };
 
+// Helper function to get common headers
+const getHeaders = () => ({
+  "Content-Type": "application/json",
+  "api-key": import.meta.env.VITE_SYSTEMPROMPT_API_KEY || "",
+});
+
 export async function readLlmConfig(): Promise<LlmConfig> {
   try {
-    const response = await fetch("/api/config/llm");
+    const response = await fetch("/v1/config/llm", {
+      headers: getHeaders(),
+    });
     if (!response.ok) {
       throw new Error(
         `Failed to read LLM configuration: ${response.statusText}`
@@ -43,7 +51,9 @@ const defaultConfig = {
 
 export async function readAgentConfig(): Promise<{ agents: AgentConfig[] }> {
   try {
-    const response = await fetch("/api/config/agent");
+    const response = await fetch("/v1/config/agent", {
+      headers: getHeaders(),
+    });
     if (!response.ok) {
       throw new Error(
         `Failed to read agent configuration: ${response.statusText}`
@@ -72,11 +82,9 @@ export async function writeAgentConfig(config: {
   agents: AgentConfig[];
 }): Promise<void> {
   try {
-    const response = await fetch("/api/config/agent", {
+    const response = await fetch("/v1/config/agent", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getHeaders(),
       body: JSON.stringify(config, null, 2),
     });
 

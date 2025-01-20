@@ -183,7 +183,7 @@ describe("useSidebarItems", () => {
     expect(result.current.sections).toHaveLength(4);
     expect(result.current.sections.map((s) => s.title)).toEqual([
       "Main",
-      "Servers",
+      "Core Servers",
       "Settings",
       "Help",
     ]);
@@ -205,7 +205,7 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const serverSection = result.current.sections.find(
-      (s) => s.title === "Servers"
+      (s) => s.title === "Core Servers"
     );
     expect(serverSection).toBeDefined();
     expect(serverSection?.items).toHaveLength(2);
@@ -218,9 +218,7 @@ describe("useSidebarItems", () => {
     expect(connectedServer?.icon).toBe(
       mockConfig.mcpServers["systemprompt-dev"].metadata.icon
     );
-    expect(connectedServer?.color).toBe(
-      mockConfig.mcpServers["systemprompt-dev"].metadata.color
-    );
+    expect(connectedServer?.color).toBe("success"); // Connected servers should use success color
     expect(connectedServer?.description).toBe(
       mockConfig.mcpServers["systemprompt-dev"].metadata.description
     );
@@ -254,7 +252,7 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const serverSection = result.current.sections.find(
-      (s) => s.title === "Servers"
+      (s) => s.title === "Core Servers"
     );
     const items = serverSection?.items || [];
 
