@@ -204,5 +204,44 @@ describe("TransportManager", () => {
         })
       ).rejects.toThrow(mockError);
     });
+
+    it("should throw error when server command is missing", async () => {
+      const config = {
+        mcpServers: {
+          "test-server": {
+            args: ["--test"],
+            env: { TEST_ENV: "test-value" },
+          },
+        },
+      };
+      const manager = new TransportManager(config);
+
+      await expect(
+        manager.createTransport({
+          transportType: "stdio",
+          serverId: "test-server",
+        })
+      ).rejects.toThrow("Server command is required for stdio transport");
+    });
+
+    it("should throw error when server command is empty", async () => {
+      const config = {
+        mcpServers: {
+          "test-server": {
+            command: "",
+            args: ["--test"],
+            env: { TEST_ENV: "test-value" },
+          },
+        },
+      };
+      const manager = new TransportManager(config);
+
+      await expect(
+        manager.createTransport({
+          transportType: "stdio",
+          serverId: "test-server",
+        })
+      ).rejects.toThrow("Server command is required for stdio transport");
+    });
   });
 });

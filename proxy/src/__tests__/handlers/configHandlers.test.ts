@@ -12,6 +12,12 @@ describe("ConfigHandlers", () => {
         args: ["--test"],
       },
     },
+    customServers: {
+      "custom-test": {
+        command: "custom-command",
+        args: ["--custom"],
+      },
+    },
     defaults: {
       serverTypes: {
         stdio: {
@@ -52,36 +58,37 @@ describe("ConfigHandlers", () => {
   });
 
   describe("handleConfig", () => {
-    it("should return remote configuration when API call succeeds", async () => {
-      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
-      const mockResponse = {
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockConfig),
-      };
-      global.fetch = vi.fn().mockResolvedValue(mockResponse);
-
+    it("should return merged configuration with custom servers", async () => {
       const req = {} as Request;
       const res = createMockResponse();
 
-      await handlers.handleConfig(req, res as unknown as Response);
+      handlers.handleConfig(req, res as unknown as Response);
 
-      expect(res.json).toHaveBeenCalledWith({
-        mcpServers: mockConfig.mcpServers,
-      });
       expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        mcpServers: {
+          default: {
+            command: "test-command",
+            args: ["--test"],
+          },
+          "custom-test": {
+            command: "custom-command",
+            args: ["--custom"],
+          },
+        },
+      });
     });
 
-    it("should handle missing API key", async () => {
-      delete process.env.SYSTEMPROMPT_API_KEY;
-
+    it("should handle missing configuration", async () => {
+      handlers = new ConfigHandlers({} as McpConfig);
       const req = {} as Request;
       const res = createMockResponse();
 
-      await handlers.handleConfig(req, res as unknown as Response);
+      handlers.handleConfig(req, res as unknown as Response);
 
-      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.status).toHaveBeenCalledWith(500);
       expect(res.json).toHaveBeenCalledWith({
-        mcpServers: mockConfig.mcpServers,
+        error: "Invalid server configuration",
       });
     });
   });

@@ -93,6 +93,11 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
       if (userData) {
         const mcpData = await fetchMcpData();
         console.log("MCP data received:", mcpData);
+        console.log("Servers received:", Object.keys(mcpData.mcpServers || {}));
+        console.log(
+          "Custom servers received:",
+          Object.keys(mcpData.customServers || {})
+        );
 
         // Update mcp.config.json with the server configuration
         try {

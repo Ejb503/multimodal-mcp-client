@@ -34,12 +34,56 @@ export class McpHandlers {
         return;
       }
 
-      res.status(200).json(response.data);
+      // Get npx path and args from environment
+      const npxPath = process.env.SYSTEMPROMPT_NPX_PATH;
+      const npxArgs = process.env.SYSTEMPROMPT_NPX_ARGS
+        ? JSON.parse(process.env.SYSTEMPROMPT_NPX_ARGS)
+        : [];
+
+      // Check if we have any contrib servers that need npx
+      const hasContribServers = Object.keys(
+        response.data.mcpServers || {}
+      ).some((name) => name.startsWith("systemprompt-mcp-"));
+
+      if (hasContribServers && !npxPath) {
+        throw new Error("SYSTEMPROMPT_NPX_PATH is not set");
+      }
+
+      // Merge remote config with local config
+      const mergedConfig = {
+        ...response.data,
+        mcpServers: {
+          ...this.config.mcpServers,
+          ...Object.fromEntries(
+            Object.entries(
+              response.data.mcpServers as McpConfig["mcpServers"]
+            ).map(([name, server]) => {
+              if (name.startsWith("systemprompt-mcp-")) {
+                return [
+                  name,
+                  {
+                    ...server,
+                    command: npxPath,
+                    args: [...npxArgs, ...(server.args || [])],
+                  },
+                ] as [string, McpConfig["mcpServers"][string]];
+              }
+              return [name, server] as [
+                string,
+                McpConfig["mcpServers"][string],
+              ];
+            })
+          ),
+        },
+      } as McpConfig;
+
+      res.status(200).json(mergedConfig);
     } catch (error) {
       console.error("Error in GET /v1/mcp:", error);
       if (
         error instanceof Error &&
-        error.message === "API key not configured"
+        (error.message === "API key not configured" ||
+          error.message === "SYSTEMPROMPT_NPX_PATH is not set")
       ) {
         throw error;
       }
@@ -127,17 +171,14 @@ export class McpHandlers {
         }
       );
 
-      // Always update local config
-      this.config = {
-        ...this.config,
-        mcpServers: {
-          ...this.config.mcpServers,
-          ...req.body.mcpServers,
-        },
-        customServers: {
-          ...this.config.customServers,
-          ...req.body.customServers,
-        },
+      // Update local config
+      this.config.mcpServers = {
+        ...this.config.mcpServers,
+        ...req.body.mcpServers,
+      };
+      this.config.customServers = {
+        ...(this.config.customServers || {}),
+        ...(req.body.customServers || {}),
       };
 
       // If remote server returns unauthorized, acknowledge local update
@@ -146,11 +187,12 @@ export class McpHandlers {
           status: "Configuration updated locally",
           _warning: "Remote update failed - unauthorized",
           mcpServers: this.config.mcpServers,
-          customServers: this.config.customServers,
+          customServers: this.config.customServers || {},
         });
         return;
       }
 
+      // On success, return only the API response
       res.status(200).json(response.data);
     } catch (error) {
       console.error("Error in POST /v1/config/mcp:", error);
@@ -166,8 +208,11 @@ export class McpHandlers {
         _warning:
           "Remote update failed - " +
           (error instanceof Error ? error.message : "unknown error"),
-        mcpServers: this.config.mcpServers,
-        customServers: this.config.customServers,
+        mcpServers: {
+          ...this.config.mcpServers,
+          ...req.body.mcpServers,
+        },
+        customServers: req.body.customServers || {},
       });
     }
   }

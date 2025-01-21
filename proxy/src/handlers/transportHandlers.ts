@@ -215,17 +215,17 @@ export class TransportHandlers {
         );
       }
 
-      // Send initial ready event through the transport
-      webAppTransport.send({
-        jsonrpc: "2.0",
-        method: "connection/ready",
-        params: {},
-      });
-
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: backingServerTransport,
         onerror: this.createErrorHandler(webAppTransport, isConnected),
+      });
+
+      // Send ready event after proxy is set up
+      webAppTransport.send({
+        jsonrpc: "2.0",
+        method: "connection/ready",
+        params: {},
       });
 
       req.on("close", () => this.handleConnectionClose(webAppTransport));

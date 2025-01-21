@@ -76,11 +76,6 @@ interface ConfigData {
 const printSection = (title: string) => {
   console.log("\n" + chalk.bold.cyan(`━━━ ${title} ━━━`));
 };
-
-const printJson = (data: ConfigData | unknown) => {
-  console.log(chalk.gray(JSON.stringify(data, null, 2)));
-};
-
 // Handle process signals
 const setupProcessHandlers = () => {
   process.on("SIGINT", () => {
@@ -280,124 +275,140 @@ export async function loadServerConfig(apiKey: string): Promise<McpConfig> {
   }).start();
 
   try {
-    // Get verified npx path
-    const npxInfo = await checkNpxAvailability();
-
-    // Default command and args that we know work from preflight check
-    const defaultCommand = npxInfo.cmd;
-    const defaultArgs = [
-      ...npxInfo.args.slice(0, -1),
-      "-y",
-      "systemprompt-agent-server",
-    ];
-
-    // Create environment object with required variables
-    const mapEnvironmentVars = (
-      env: Record<string, unknown> = {}
-    ): Record<string, string> => {
-      const result: Record<string, string> = {};
-
-      // Map environment variables from array-style to key-value pairs
-      Object.entries(env).forEach(([key, value]) => {
-        // If it's a numeric key, treat it as an array index pointing to an env var name
-        if (!isNaN(Number(key)) && typeof value === "string") {
-          // Get the actual value from process.env
-          const envValue = process.env[value];
-          if (envValue) {
-            result[value] = envValue;
-          }
-        }
-        // If it's a direct key-value pair, use it as is
-        else if (typeof value === "string") {
-          result[key] = value;
-        }
-      });
-
-      return result;
-    };
-
-    // Default config with a working command
-    const defaultConfig: McpConfig = {
-      mcpServers: {
-        default: {
-          command: defaultCommand,
-          args: defaultArgs,
-          env: {
-            "0": "SYSTEMPROMPT_API_KEY",
-            "1": "NOTION_API_KEY",
-          },
-        },
+    // Load contrib servers from API
+    const response = await fetch("http://127.0.0.1/v1/mcp", {
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
       },
-    };
+    });
 
-    // Debug log the command and environment
-    console.log(chalk.dim("\nServer Command:"));
-    console.log(chalk.gray(`${defaultCommand} ${defaultArgs.join(" ")}`));
-    console.log(chalk.dim("\nServer Environment:"));
-    console.log(
-      chalk.gray(
-        JSON.stringify(
-          mapEnvironmentVars(defaultConfig.mcpServers.default.env),
-          null,
-          2
-        )
-      )
-    );
-
-    try {
-      const response = await fetch("http://127.0.0.1/v1/mcp", {
-        headers: {
-          "api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.ok) {
-        const config = (await response.json()) as McpConfig;
-
-        // Ensure all servers use the verified command, args and environment variables
-        if (config.mcpServers) {
-          Object.entries(config.mcpServers).forEach(([serverId, server]) => {
-            config.mcpServers[serverId] = {
-              ...server,
-              command: defaultCommand,
-              args: defaultArgs,
-              env: server.env || {
-                "0": "SYSTEMPROMPT_API_KEY",
-                "1": "NOTION_API_KEY",
-              },
-            };
-
-            // Debug log each server's configuration
-            console.log(chalk.dim(`\nServer Configuration for ${serverId}:`));
-            console.log(
-              chalk.gray(`Command: ${defaultCommand} ${defaultArgs.join(" ")}`)
-            );
-            console.log(chalk.gray("Environment:"));
-            console.log(
-              chalk.gray(
-                JSON.stringify(
-                  mapEnvironmentVars(config.mcpServers[serverId].env),
-                  null,
-                  2
-                )
-              )
-            );
-          });
-        }
-
-        spinner.succeed("Server configuration loaded from API");
-        console.log(chalk.dim("\nServer Configuration:"));
-        return config;
-      }
-    } catch {
-      console.log(chalk.yellow("Using default configuration"));
+    if (!response.ok) {
+      spinner.fail("Failed to load server configuration");
+      throw new Error(`Failed to load config: ${response.statusText}`);
     }
 
-    spinner.succeed("Server configuration loaded");
-    console.log(chalk.dim("\nDefault Configuration:"));
-    printJson(defaultConfig);
-    return defaultConfig;
+    const contribConfig = (await response.json()) as McpConfig;
+    if (!contribConfig.mcpServers) {
+      spinner.fail("Invalid server configuration");
+      throw new Error("Server configuration is missing mcpServers");
+    }
+
+    // Set command and args from environment for contrib servers
+    const npxPath = process.env.SYSTEMPROMPT_NPX_PATH;
+    const npxArgs = process.env.SYSTEMPROMPT_NPX_ARGS
+      ? JSON.parse(process.env.SYSTEMPROMPT_NPX_ARGS)
+      : [];
+
+    if (!npxPath) {
+      spinner.fail("NPX path not found in environment");
+      throw new Error("SYSTEMPROMPT_NPX_PATH is not set");
+    }
+
+    // Create a new config object with the merged settings
+    const mergedContribConfig = {
+      ...contribConfig,
+      mcpServers: Object.fromEntries(
+        Object.entries(contribConfig.mcpServers).map(([name, server]) => {
+          if (name.startsWith("systemprompt-mcp-")) {
+            // For contrib servers, we want to run: cmd.exe /C npx.cmd package-name
+            // So we take the first two parts of npxArgs (/C and npx.cmd path)
+            const baseNpxArgs = npxArgs.slice(0, 2);
+            return [
+              name,
+              {
+                ...server,
+                command: npxPath,
+                args: [...baseNpxArgs, name],
+              },
+            ] as [string, McpConfig["mcpServers"][string]];
+          }
+          return [name, server] as [string, McpConfig["mcpServers"][string]];
+        })
+      ),
+    } as McpConfig;
+
+    // Debug log the contrib servers
+    console.log(chalk.gray("\nContrib servers loaded from API:"));
+    Object.entries(mergedContribConfig.mcpServers).forEach(([name, server]) => {
+      console.log(chalk.gray(`  ✓ ${name}:`));
+      console.log(chalk.gray(`    command: ${server.command || "undefined"}`));
+      console.log(chalk.gray(`    args: ${JSON.stringify(server.args || [])}`));
+      if (server.env && Array.isArray(server.env)) {
+        console.log(chalk.gray(`    environment:`));
+        server.env.forEach((envVar: string) => {
+          const isSet = process.env[envVar] !== undefined;
+          console.log(chalk.gray(`      ${isSet ? "✓" : "✗"} ${envVar}`));
+        });
+      }
+    });
+
+    spinner.succeed("Loaded contrib servers");
+
+    // Try to load custom servers from file
+    spinner.start("Adding custom servers...");
+    try {
+      const customConfigStr = await fs.readFile(
+        "config/mcp.config.custom.json",
+        "utf-8"
+      );
+      const customConfig = JSON.parse(customConfigStr) as McpConfig;
+
+      // Validate custom config
+      if (!customConfig.mcpServers) {
+        throw new Error("Custom configuration is missing mcpServers");
+      }
+
+      // Only show servers that start with "custom-" prefix
+      const customServers = Object.entries(customConfig.mcpServers).filter(
+        ([name]) => name.startsWith("custom-")
+      );
+
+      // Validate each custom server has a command
+      customServers.forEach(([name, server]) => {
+        if (!server.command || server.command.trim() === "") {
+          spinner.fail(`Invalid server configuration for ${name}`);
+          throw new Error(`Server "${name}" has no command specified`);
+        }
+      });
+
+      // Merge custom servers with contrib servers
+      const finalConfig = {
+        mcpServers: {
+          ...mergedContribConfig.mcpServers,
+          ...customConfig.mcpServers,
+        },
+      };
+
+      spinner.succeed("Added custom servers");
+
+      // Print the custom servers that were added
+      if (customServers.length > 0) {
+        console.log(
+          chalk.gray(`Added ${customServers.length} custom server(s):`)
+        );
+        customServers.forEach(([name, server]) => {
+          console.log(
+            chalk.gray(
+              `  ✓ ${name} - ${server.metadata?.description || "No description"}`
+            )
+          );
+          if (server.env && Array.isArray(server.env)) {
+            console.log(chalk.gray(`    environment:`));
+            server.env.forEach((envVar) => {
+              const isSet = process.env[envVar] !== undefined;
+              console.log(chalk.gray(`      ${isSet ? "✓" : "✗"} ${envVar}`));
+            });
+          }
+        });
+      }
+
+      return finalConfig;
+    } catch (_error) {
+      // If custom config fails to load, just return contrib config
+      spinner.info("No custom servers found");
+      return mergedContribConfig;
+    }
   } catch (error) {
     spinner.fail("Failed to load configuration");
     console.error(chalk.red("Error loading server config:"), error);
@@ -413,7 +424,7 @@ export async function loadUserConfig(apiKey: string): Promise<McpConfig> {
   printSection("User Configuration");
 
   const spinner = ora({
-    text: "Loading server configuration...",
+    text: "Loading user configuration...",
     color: "cyan",
   }).start();
 
@@ -426,53 +437,19 @@ export async function loadUserConfig(apiKey: string): Promise<McpConfig> {
     });
 
     if (!response.ok) {
+      spinner.fail("Failed to load user configuration");
       throw new Error(`Failed to load config: ${response.statusText}`);
     }
 
-    const config = await response.json();
-    printJson(config);
+    const config = (await response.json()) as McpConfig;
     spinner.succeed("User configuration loaded");
     return config;
   } catch (error) {
     spinner.fail("Failed to load configuration");
-    console.error(chalk.red("Error loading server config:"), error);
+    console.error(chalk.red("Error loading user config:"), error);
     throw error;
   }
 }
-
-// /**
-//  * Loads and verifies the server configuration
-//  * @returns Promise that resolves when config is verified
-//  */
-// export async function loadAgentConfig(apiKey: string): Promise<McpConfig> {
-//   printSection("Server Configuration");
-
-//   const spinner = ora({
-//     text: "Loading server configuration...",
-//     color: "cyan",
-//   }).start();
-
-//   try {
-//     const response = await fetch("http://127.0.0.1/v1/mcp", {
-//       headers: {
-//         "api-key": apiKey,
-//         "Content-Type": "application/json",
-//       },
-//     });
-
-//     if (!response.ok) {
-//       throw new Error(`Failed to load config: ${response.statusText}`);
-//     }
-
-//     const config = await response.json();
-//     spinner.succeed("Server configuration loaded");
-//     return config;
-//   } catch (error) {
-//     spinner.fail("Failed to load configuration");
-//     console.error(chalk.red("Error loading server config:"), error);
-//     throw error;
-//   }
-// }
 
 /**
  * Updates server configuration with correct npx paths and starts the server
@@ -488,60 +465,90 @@ export async function updateServerPaths(npxInfo: {
     color: "cyan",
   }).start();
 
-  // Use absolute paths and normalize for cross-platform compatibility
-  const configPath = resolve(process.cwd(), "proxy/src/server.config.json");
   try {
-    const existingConfig = JSON.parse(
-      await fs.readFile(configPath, "utf8")
-    ) as ConfigData;
-
-    if (!existingConfig?.mcpServers) {
-      spinner.warn("No MCP servers found in config");
-      return;
+    // Get the current API key
+    const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+    if (!apiKey) {
+      throw new Error("API key not found in environment");
     }
 
+    // Get current config from API
+    const response = await fetch("http://127.0.0.1/v1/mcp", {
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load config: ${response.statusText}`);
+    }
+
+    const config = (await response.json()) as ConfigData;
+
+    console.log(chalk.gray("\nServer configurations before update:"));
+    Object.entries(config.mcpServers || {}).forEach(([name, server]) => {
+      console.log(chalk.gray(`  ${name}:`));
+      console.log(chalk.gray(`    command: ${server.command || "undefined"}`));
+      console.log(chalk.gray(`    args: ${JSON.stringify(server.args || [])}`));
+    });
+
     // Update npx path in all server configurations
-    Object.entries(existingConfig.mcpServers).forEach(([, server]) => {
-      if (server?.command?.includes?.("npx")) {
+    Object.entries(config.mcpServers || {}).forEach(([name, server]) => {
+      // For core servers (systemprompt-mcp-*), always set the npx command
+      if (name.startsWith("systemprompt-mcp-")) {
+        const oldCommand = server.command;
+        const oldArgs = [...(server.args || [])];
+
         server.command = npxInfo.cmd;
         server.args = [
           ...npxInfo.args.slice(0, -1),
           ...(server.args?.slice?.(1) || []),
         ];
+
+        console.log(chalk.gray(`\nUpdating core server "${name}":`));
+        console.log(chalk.gray(`  Before:`));
+        console.log(chalk.gray(`    command: ${oldCommand || "undefined"}`));
+        console.log(chalk.gray(`    args: ${JSON.stringify(oldArgs)}`));
+        console.log(chalk.gray(`  After:`));
+        console.log(chalk.gray(`    command: ${server.command}`));
+        console.log(chalk.gray(`    args: ${JSON.stringify(server.args)}`));
+      } else if (server.command?.includes("npx")) {
+        // For other servers, only update if they use npx
+        const oldCommand = server.command;
+        const oldArgs = [...(server.args || [])];
+
+        server.command = npxInfo.cmd;
+        server.args = [
+          ...npxInfo.args.slice(0, -1),
+          ...(server.args?.slice?.(1) || []),
+        ];
+
+        console.log(chalk.gray(`\nUpdating npx server "${name}":`));
+        console.log(chalk.gray(`  Before:`));
+        console.log(chalk.gray(`    command: ${oldCommand}`));
+        console.log(chalk.gray(`    args: ${JSON.stringify(oldArgs)}`));
+        console.log(chalk.gray(`  After:`));
+        console.log(chalk.gray(`    command: ${server.command}`));
+        console.log(chalk.gray(`    args: ${JSON.stringify(server.args)}`));
       }
     });
 
-    await fs.writeFile(configPath, JSON.stringify(existingConfig, null, 2));
     spinner.succeed("Server paths updated");
 
-    console.log(chalk.yellow("\nUpdated Configuration:"));
-    printJson(existingConfig);
-
-    // Setup process handlers
-    setupProcessHandlers();
-
-    // Start the server using tsx
-    spinner.start("Starting server...");
-
-    const indexPath = resolve(process.cwd(), "proxy/src/index.ts");
-
-    const serverProcess = spawn(
-      process.platform === "win32" ? "tsx.cmd" : "tsx",
-      ["--tsconfig", "proxy/tsconfig.json", indexPath],
-      {
-        stdio: "inherit",
-        shell: true,
-        env: process.env,
-      }
-    );
-
-    serverProcess.on("error", (err) => {
-      spinner.fail("Failed to start server");
-      console.error(chalk.red("Error starting server:"), err);
-      process.exit(1);
+    // Send updated config to API
+    const updateResponse = await fetch("http://127.0.0.1/v1/mcp", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(config),
     });
 
-    spinner.succeed("Server started");
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to update config: ${updateResponse.statusText}`);
+    }
   } catch (error) {
     spinner.fail("Failed to update server paths");
     console.error(chalk.red("Error updating server paths:"), error);

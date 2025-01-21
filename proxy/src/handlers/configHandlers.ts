@@ -13,7 +13,10 @@ export class ConfigHandlers {
         throw new Error("Invalid server configuration");
       }
       const config = {
-        mcpServers: this.config.mcpServers,
+        mcpServers: {
+          ...this.config.mcpServers,
+          ...this.config.customServers,
+        },
       };
       res.status(200).json(config);
     } catch (error) {

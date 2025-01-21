@@ -67,7 +67,14 @@ describe("McpHandlers", () => {
     it("should return remote MCP configuration when API call succeeds", async () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
       const mockResponse = {
-        data: mockConfig,
+        data: {
+          mcpServers: {
+            remote: {
+              command: "remote-command",
+              args: ["--remote"],
+            },
+          },
+        },
         status: 200,
       };
       mockedAxios.get.mockResolvedValueOnce(mockResponse);
@@ -78,7 +85,18 @@ describe("McpHandlers", () => {
       await handlers.handleGetMcp(req, res as unknown as Response);
 
       expect(res.status).toHaveBeenCalledWith(200);
-      expect(res.json).toHaveBeenCalledWith(mockConfig);
+      expect(res.json).toHaveBeenCalledWith({
+        mcpServers: {
+          remote: {
+            command: "remote-command",
+            args: ["--remote"],
+          },
+          default: {
+            command: "test-command",
+            args: ["--test"],
+          },
+        },
+      });
     });
 
     it("should handle missing API key", async () => {
@@ -108,6 +126,91 @@ describe("McpHandlers", () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(mockConfig);
+    });
+
+    it("should return local config when remote server returns unauthorized", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+      const mockResponse = {
+        status: 401,
+        data: { error: "Unauthorized" },
+      };
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const req = {} as Request;
+      const res = createMockResponse();
+
+      await handlers.handleGetMcp(req, res as unknown as Response);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockConfig);
+    });
+
+    it("should merge environment-based command and args for contrib servers", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+      process.env.SYSTEMPROMPT_NPX_PATH = "test-npx";
+      process.env.SYSTEMPROMPT_NPX_ARGS = JSON.stringify(["/C", "npx.cmd"]);
+
+      const mockResponse = {
+        data: {
+          mcpServers: {
+            "systemprompt-mcp-notion": {
+              command: undefined,
+              args: ["systemprompt-mcp-notion"],
+            },
+            default: {
+              command: "test-command",
+              args: ["--test"],
+            },
+          },
+        },
+        status: 200,
+      };
+
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const req = {} as Request;
+      const res = createMockResponse();
+
+      await handlers.handleGetMcp(req, res as unknown as Response);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        mcpServers: {
+          "systemprompt-mcp-notion": {
+            command: "test-npx",
+            args: ["/C", "npx.cmd", "systemprompt-mcp-notion"],
+          },
+          default: {
+            command: "test-command",
+            args: ["--test"],
+          },
+        },
+      });
+    });
+
+    it("should throw error if SYSTEMPROMPT_NPX_PATH is not set for contrib servers", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+      delete process.env.SYSTEMPROMPT_NPX_PATH;
+
+      const mockResponse = {
+        data: {
+          mcpServers: {
+            "systemprompt-mcp-notion": {
+              command: undefined,
+              args: [],
+            },
+          },
+        },
+        status: 200,
+      };
+      mockedAxios.get.mockResolvedValueOnce(mockResponse);
+
+      const req = {} as Request;
+      const res = createMockResponse();
+
+      await expect(
+        handlers.handleGetMcp(req, res as unknown as Response)
+      ).rejects.toThrow("SYSTEMPROMPT_NPX_PATH is not set");
     });
   });
 
@@ -296,6 +399,88 @@ describe("McpHandlers", () => {
           _warning: "Remote update failed - timeout of 5000ms exceeded",
         })
       );
+    });
+
+    it("should merge custom servers with existing config", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+      const mockResponse = {
+        data: { status: "success" },
+        status: 200,
+      };
+      mockedAxios.post.mockResolvedValueOnce(mockResponse);
+
+      const customConfig = {
+        mcpServers: {
+          custom: {
+            command: "custom-command",
+            args: ["--custom"],
+          },
+        },
+        customServers: {
+          custom2: {
+            command: "custom2-command",
+            args: ["--custom2"],
+          },
+        },
+      };
+
+      const req = {
+        body: customConfig,
+      } as Request;
+      const res = createMockResponse();
+
+      await handlers.handlePostConfigMcp(req, res as unknown as Response);
+
+      // Verify local config was updated
+      const getReq = {} as Request;
+      const getRes = createMockResponse();
+      await handlers.handleGetMcp(getReq, getRes as unknown as Response);
+
+      expect(getRes.status).toHaveBeenCalledWith(200);
+      expect(getRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mcpServers: expect.objectContaining({
+            default: mockConfig.mcpServers.default,
+            custom: customConfig.mcpServers.custom,
+          }),
+          customServers: expect.objectContaining({
+            custom2: customConfig.customServers.custom2,
+          }),
+        })
+      );
+    });
+
+    it("should update local config even when remote update fails", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+      const error = new Error("Network error");
+      mockedAxios.post.mockRejectedValueOnce(error);
+
+      const newConfig = {
+        mcpServers: {
+          new: {
+            command: "new-command",
+            args: ["--new"],
+          },
+        },
+      };
+
+      const req = {
+        body: newConfig,
+      } as Request;
+      const res = createMockResponse();
+
+      await handlers.handlePostConfigMcp(req, res as unknown as Response);
+
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        status: "Configuration updated locally",
+        _warning: "Remote update failed - Network error",
+        mcpServers: {
+          ...mockConfig.mcpServers,
+          ...newConfig.mcpServers,
+        },
+        customServers: {},
+      });
     });
   });
 });

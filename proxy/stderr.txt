@@ -1,0 +1,7 @@
+2025-01-21T12:25:31.752Z agentkeepalive sock[0#registry.npmjs.org:443::::::::true:::::::::::::] create, timeout 300001ms
+2025-01-21T12:25:32.314Z agentkeepalive sock[0#registry.npmjs.org:443::::::::true:::::::::::::](requests: 1, finished: 1) free
+2025-01-21T12:25:47.326Z agentkeepalive sock[0#registry.npmjs.org:443::::::::true:::::::::::::](requests: 1, finished: 1) timeout after 15000ms, listeners 2, defaultTimeoutListenerCount 3, hasHttpRequest false, HttpRequest timeoutListenerCount 0
+2025-01-21T12:25:47.336Z agentkeepalive timeout listeners: onTimeout, onTimeout
+2025-01-21T12:25:47.338Z agentkeepalive sock[0#registry.npmjs.org:443::::::::true:::::::::::::] is free, destroy quietly
+2025-01-21T12:25:47.340Z agentkeepalive sock[0#registry.npmjs.org:443::::::::true:::::::::::::](requests: 1, finished: 1) close, isError: false
+^C^C

@@ -78,6 +78,10 @@ export class TransportManager {
       throw new Error(`No configuration found for server: ${serverId}`);
     }
 
+    if (!serverConfig.command || serverConfig.command.trim() === "") {
+      throw new Error("Server command is required for stdio transport");
+    }
+
     console.log(`Setting up stdio transport for server ${serverId}`);
 
     // Map environment variables
