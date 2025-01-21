@@ -125,60 +125,6 @@ describe("McpApiService", () => {
     });
   });
 
-  describe("transformServers", () => {
-    const originalEnv = process.env;
-
-    beforeEach(() => {
-      process.env = { ...originalEnv };
-      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
-    });
-
-    afterEach(() => {
-      process.env = originalEnv;
-    });
-
-    it("should transform servers correctly", async () => {
-      const inputServers: Record<string, ServerConfig> = {
-        test1: {
-          command: "original-command",
-          args: ["--original"],
-        },
-        test2: {
-          command: "another-command",
-          args: ["--another"],
-        },
-      };
-
-      const result = await service.transformServers(inputServers);
-
-      expect(Object.keys(result)).toEqual(["test1", "test2"]);
-      expect(result.test1).toEqual({
-        command: "C:\\Program Files\\nodejs\\npx.cmd",
-        args: ["-y", "test1"],
-        env: { SYSTEMPROMPT_API_KEY: "test-api-key" },
-        metadata: {
-          icon: "solar:programming-line-duotone",
-          color: "secondary",
-          description: "test1 MCP server",
-          serverType: "core",
-        },
-      });
-    });
-
-    it("should handle missing API key", async () => {
-      delete process.env.SYSTEMPROMPT_API_KEY;
-      const inputServers: Record<string, ServerConfig> = {
-        test: {
-          command: "test-command",
-          args: ["--test"],
-        },
-      };
-
-      const result = await service.transformServers(inputServers);
-      expect(result.test.env?.SYSTEMPROMPT_API_KEY).toBe("");
-    });
-  });
-
   describe("fetchFromApi", () => {
     it("should handle custom request options", async () => {
       const mockData = { test: true };

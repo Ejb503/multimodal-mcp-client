@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import type { McpConfig } from "../types/index.js";
 import axios from "axios";
+import path from "path";
 
 // LLMS: DO NOT CHANGE
 const MCP_SERVER_URL = "http://127.0.0.1";
@@ -34,21 +35,6 @@ export class McpHandlers {
         return;
       }
 
-      // Get npx path and args from environment
-      const npxPath = process.env.SYSTEMPROMPT_NPX_PATH;
-      const npxArgs = process.env.SYSTEMPROMPT_NPX_ARGS
-        ? JSON.parse(process.env.SYSTEMPROMPT_NPX_ARGS)
-        : [];
-
-      // Check if we have any contrib servers that need npx
-      const hasContribServers = Object.keys(
-        response.data.mcpServers || {}
-      ).some((name) => name.startsWith("systemprompt-mcp-"));
-
-      if (hasContribServers && !npxPath) {
-        throw new Error("SYSTEMPROMPT_NPX_PATH is not set");
-      }
-
       // Merge remote config with local config
       const mergedConfig = {
         ...response.data,
@@ -59,12 +45,20 @@ export class McpHandlers {
               response.data.mcpServers as McpConfig["mcpServers"]
             ).map(([name, server]) => {
               if (name.startsWith("systemprompt-mcp-")) {
+                // For backend servers, set command to node and args to the server path
+                const serverPath = path.join(
+                  process.cwd(),
+                  "extensions",
+                  name,
+                  "build",
+                  "index.js"
+                );
                 return [
                   name,
                   {
                     ...server,
-                    command: npxPath,
-                    args: [...npxArgs, ...(server.args || [])],
+                    command: "node",
+                    args: [serverPath],
                   },
                 ] as [string, McpConfig["mcpServers"][string]];
               }

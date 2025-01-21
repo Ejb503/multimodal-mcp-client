@@ -32,23 +32,8 @@ export class McpApiService {
   async transformServers(
     servers: Record<string, ServerConfig>
   ): Promise<Record<string, ServerConfig>> {
-    const transformedServers: Record<string, ServerConfig> = {};
-
-    for (const id of Object.keys(servers)) {
-      transformedServers[id] = {
-        command: "C:\\Program Files\\nodejs\\npx.cmd",
-        args: ["-y", id],
-        env: { SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "" },
-        metadata: {
-          icon: "solar:programming-line-duotone",
-          color: "secondary",
-          description: `${id} MCP server`,
-          serverType: "core",
-        },
-      };
-    }
-
-    return transformedServers;
+    // Just return the servers as-is, no transformation needed
+    return servers;
   }
 
   async fetchFromApi<T>(

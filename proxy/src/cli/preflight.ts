@@ -3,7 +3,11 @@ import ora from "ora";
 import fs from "fs/promises";
 import path from "path";
 import { input } from "@inquirer/prompts";
-import { McpConfig } from "../types/index.js";
+import {
+  McpConfig,
+  ServerConfig,
+  BackendServerConfig,
+} from "../types/index.js";
 
 // Required environment variables
 const REQUIRED_ENV_VARS = [
@@ -148,15 +152,7 @@ export async function loadServerConfig(): Promise<McpConfig> {
 
     // First try to load servers from the backend
     spinner.start("Loading servers from backend...");
-    interface BackendServer {
-      env?: string[];
-      metadata?: {
-        icon?: string;
-        description?: string;
-      };
-      agent?: unknown[];
-    }
-    let backendServers: Record<string, BackendServer> = {};
+    let backendServers: Record<string, BackendServerConfig> = {};
     try {
       const response = await fetch("http://127.0.0.1/v1/mcp", {
         headers: {
@@ -168,6 +164,19 @@ export async function loadServerConfig(): Promise<McpConfig> {
       if (response.ok) {
         const data = await response.json();
         backendServers = data.mcpServers || {};
+        console.log(
+          "Raw backend server data:",
+          JSON.stringify(data.mcpServers, null, 2)
+        );
+        console.log(
+          "Raw backend server commands:",
+          Object.entries(data.mcpServers || {}).map(([name, server]) => ({
+            name,
+            env: (server as BackendServerConfig).env,
+            metadata: (server as BackendServerConfig).metadata,
+            agent: (server as BackendServerConfig).agent,
+          }))
+        );
 
         // Check each backend server for its extension
         Object.keys(backendServers).forEach((name) => {
@@ -195,7 +204,7 @@ export async function loadServerConfig(): Promise<McpConfig> {
       const customConfigStr = await fs.readFile(customConfigPath, "utf-8");
       const customConfig = JSON.parse(customConfigStr);
 
-      interface ServerConfig {
+      type ServerConfigInput = {
         command: string;
         args: string[];
         env?: string[] | Record<string, string>;
@@ -203,10 +212,11 @@ export async function loadServerConfig(): Promise<McpConfig> {
           icon?: string;
           description?: string;
         };
-      }
+        agent?: unknown[];
+      };
 
       // Type guard for ServerConfig
-      function isServerConfig(value: unknown): value is ServerConfig {
+      function isServerConfig(value: unknown): value is ServerConfigInput {
         if (typeof value !== "object" || value === null) return false;
 
         const candidate = value as {
@@ -229,7 +239,7 @@ export async function loadServerConfig(): Promise<McpConfig> {
             ([key, value]) => key !== "mcpServers" && isServerConfig(value)
           )
         ),
-      } as Record<string, ServerConfig>;
+      } as Record<string, ServerConfigInput>;
 
       // Check for any servers that require extensions
       Object.entries(allCustomServers).forEach(([name, server]) => {
@@ -254,6 +264,45 @@ export async function loadServerConfig(): Promise<McpConfig> {
         }
       });
 
+      // Convert backend servers to local configurations
+      const processedBackendServers = Object.fromEntries(
+        Object.entries(backendServers).map(([name, server]) => {
+          const serverPath = path.resolve(
+            process.cwd(),
+            path.normalize(path.join("extensions", name, "build", "index.js"))
+          );
+
+          // Get API keys from the backend server config
+          const apiKeys = Object.fromEntries(
+            (server.env || []).map((key) => [key, process.env[key] || ""])
+          );
+
+          spinner.succeed(`Found backend server: ${name}`);
+          console.log(`Backend server ${name} config:`, {
+            env: server.env,
+            metadata: server.metadata,
+            agent: server.agent,
+            final: {
+              command: "node",
+              args: [serverPath],
+            },
+          });
+
+          // Create a deep copy of the server config to avoid reference issues
+          const serverConfig = {
+            env: apiKeys,
+            metadata: server.metadata ? { ...server.metadata } : undefined,
+            agent: server.agent ? [...server.agent] : undefined,
+            // Always use node with the server path for backend servers
+            command: "node",
+            args: [serverPath],
+          } satisfies ServerConfig;
+
+          // Always use node directly with the server path
+          return [name, serverConfig];
+        })
+      );
+
       // Process each custom server
       const processedCustomServers = Object.fromEntries(
         Object.entries(allCustomServers).map(([name, server]) => {
@@ -276,72 +325,43 @@ export async function loadServerConfig(): Promise<McpConfig> {
             ...envVars,
             SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "",
           };
-
-          // On Windows, wrap non-cmd.exe commands with cmd.exe
-          const isWin = process.platform === "win32";
-          const needsCmd = isWin && !server.command.endsWith("cmd.exe");
+          console.log(`Custom server ${name} env:`, server.env);
+          console.log(`Custom server ${name} serverEnv:`, serverEnv);
 
           spinner.succeed(`Found custom server: ${name}`);
+          console.log(`Custom server ${name} command:`, {
+            command: server.command,
+            args: server.args.map((arg) =>
+              path.resolve(process.cwd(), path.normalize(arg))
+            ),
+          });
 
           return [
             name,
             {
               ...server,
-              command: needsCmd ? "cmd.exe" : server.command,
-              args: needsCmd
-                ? ["/C", server.command, ...(server.args || [])]
-                : server.args || [],
+              command: server.command,
+              args: server.args.map((arg) =>
+                path.resolve(process.cwd(), path.normalize(arg))
+              ),
               env: serverEnv,
             },
           ] as [string, McpConfig["mcpServers"][string]];
         })
       );
 
-      // Convert backend servers to local configurations
-      const processedBackendServers = Object.fromEntries(
-        Object.entries(backendServers)
-          .filter(([name]) => availableExtensions.has(name))
-          .map(([name, server]) => {
-            const serverPath = path.join(
-              "extensions",
-              name,
-              "build",
-              "index.js"
-            );
-            const isWin = process.platform === "win32";
-
-            // Get API keys from the backend server config
-            const apiKeys = (server.env || []).reduce(
-              (acc: Record<string, string>, key: string) => {
-                if (process.env[key]) {
-                  acc[key] = process.env[key] as string;
-                }
-                return acc;
-              },
-              {}
-            );
-
-            spinner.succeed(`Found backend server: ${name}`);
-
-            return [
-              name,
-              {
-                ...server,
-                command: isWin ? "cmd.exe" : "node",
-                args: isWin ? ["/C", "node", serverPath] : [serverPath],
-                env: apiKeys,
-              },
-            ];
-          })
-      );
-
       // Merge both sets of servers
-      const finalConfig = {
+      const finalConfig: McpConfig = {
         mcpServers: {
-          ...processedBackendServers,
-          ...processedCustomServers,
+          ...processedCustomServers, // Custom servers first (lower priority)
+          ...processedBackendServers, // Backend servers override (higher priority)
         },
       };
+
+      console.log(
+        "Final server configs:",
+        JSON.stringify(finalConfig.mcpServers, null, 2)
+      );
 
       // Save the processed config back to mcp.config.json
       const configPath = path.join("config", "mcp.config.json");
@@ -352,6 +372,19 @@ export async function loadServerConfig(): Promise<McpConfig> {
       await fs.writeFile(
         configPath,
         JSON.stringify(configWithWarning, null, 2)
+      );
+
+      // Verify the saved config
+      const savedConfig = JSON.parse(await fs.readFile(configPath, "utf-8"));
+      console.log(
+        "Verifying saved config - backend server commands:",
+        Object.entries(savedConfig.mcpServers)
+          .filter(([name]) => name.startsWith("systemprompt-mcp-"))
+          .map(([name, server]) => ({
+            name,
+            command: (server as ServerConfig).command,
+            args: (server as ServerConfig).args,
+          }))
       );
 
       spinner.succeed("Loaded and saved server configurations");

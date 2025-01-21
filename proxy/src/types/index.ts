@@ -12,11 +12,29 @@ export interface ServerMetadata {
   serverType?: "core" | "custom";
 }
 
+export interface BackendServerConfig {
+  env?: string[];
+  metadata?: {
+    icon?: string;
+    description?: string;
+  };
+  agent?: unknown[];
+}
+
 export interface ServerConfig {
   command: string;
   args?: string[];
   env?: Record<string, string>;
+  metadata?: Record<string, unknown>;
+  agent?: unknown[];
+}
+
+export interface ServerConfigInput {
+  command: string;
+  args?: string[];
+  env?: Record<string, string> | string[];
   metadata?: ServerMetadata;
+  agent?: unknown[];
 }
 
 export interface ApiServerConfig {

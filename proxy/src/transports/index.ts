@@ -19,13 +19,23 @@ export interface TransportParams {
  * @returns Mapped environment variables
  */
 export function mapEnvironmentVariables(
-  envConfig: Record<string, unknown> = {},
+  envConfig: Record<string, unknown> | string[] = {},
   baseEnv: Record<string, string> = process.env as Record<string, string>
 ): Record<string, string> {
-  // Start with base environment if provided
-  const env = { ...baseEnv };
+  // Start with a fresh environment
+  const env: Record<string, string> = {};
 
-  // Map array-style environment variables to their actual values
+  // Handle array-style environment variables
+  if (Array.isArray(envConfig)) {
+    envConfig.forEach((key) => {
+      if (typeof key === "string" && baseEnv[key]) {
+        env[key] = baseEnv[key];
+      }
+    });
+    return env;
+  }
+
+  // Handle object-style environment variables
   Object.entries(envConfig).forEach(([key, value]) => {
     if (!isNaN(Number(key)) && typeof value === "string" && baseEnv[value]) {
       // For array-style env vars, use the env var name as the key
@@ -45,6 +55,16 @@ export class TransportManager {
 
   constructor(config: McpConfig) {
     this.config = config;
+    console.log(
+      "Transport manager initialized with config:",
+      Object.entries(config.mcpServers)
+        .filter(([name]) => name.startsWith("systemprompt-mcp-"))
+        .map(([name, server]) => ({
+          name,
+          command: server.command,
+          args: server.args,
+        }))
+    );
   }
 
   public validateTransportParams(query: Request["query"]): TransportParams {
@@ -83,9 +103,16 @@ export class TransportManager {
     }
 
     console.log(`Setting up stdio transport for server ${serverId}`);
+    console.log("Server config:", JSON.stringify(serverConfig, null, 2));
+    console.log("Full server config:", {
+      command: serverConfig.command,
+      args: serverConfig.args,
+      env: serverConfig.env,
+    });
 
     // Map environment variables
     const env = mapEnvironmentVariables(serverConfig.env);
+    console.log("Mapped environment:", env);
 
     // Debug log the mapped environment
     const mappedEnvOnly = Object.fromEntries(
@@ -101,6 +128,11 @@ export class TransportManager {
       args: serverConfig.args || [],
       env,
       stderr: "pipe",
+    });
+    console.log("Transport config:", {
+      command: serverConfig.command,
+      args: serverConfig.args || [],
+      env: Object.keys(env),
     });
 
     try {
