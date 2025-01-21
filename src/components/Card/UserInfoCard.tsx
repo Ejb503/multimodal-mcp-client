@@ -1,5 +1,4 @@
 import { Button, Chip } from "@nextui-org/react";
-import { Icon } from "@iconify/react";
 import { BaseCard } from "./BaseCard";
 
 interface UserInfoCardProps {

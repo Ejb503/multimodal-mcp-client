@@ -209,6 +209,7 @@ describe("TransportManager", () => {
       const config = {
         mcpServers: {
           "test-server": {
+            command: undefined as unknown as string,
             args: ["--test"],
             env: { TEST_ENV: "test-value" },
           },

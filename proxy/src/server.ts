@@ -7,12 +7,7 @@ import mcpProxy from "./mcpProxy.js";
 import { ConfigHandlers } from "./handlers/configHandlers.js";
 import { McpHandlers } from "./handlers/mcpHandlers.js";
 import { defaults } from "./config/defaults.js";
-import {
-  checkNpxAvailability,
-  verifyMcpPackage,
-  loadServerConfig,
-  loadUserConfig,
-} from "./cli/preflight.js";
+import { loadServerConfig, loadUserConfig } from "./cli/preflight.js";
 import { TransportManager } from "./transports/index.js";
 import chalk from "chalk";
 import { validateEnvironmentVariables } from "./cli/preflight.js";

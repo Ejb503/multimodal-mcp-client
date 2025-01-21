@@ -3,6 +3,12 @@ export interface ServerMetadata {
   description?: string;
   icon?: string;
   color?: "success" | "warning" | "primary" | "secondary";
+  environment?: string;
+  serverStartTime?: string;
+  customData?: {
+    serverFeatures?: string[];
+    [key: string]: unknown;
+  };
 }
 
 export interface StdioServerConfig {

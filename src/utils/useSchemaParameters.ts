@@ -33,7 +33,7 @@ export interface UseSchemaParametersReturn {
   setValue: (key: string, value: unknown) => void;
   setValues: (values: Record<string, unknown>) => void;
   validate: (schema: JSONSchema7) => boolean;
-  reset: () => void;
+  reset: (schema?: JSONSchema7) => void;
   createEmptyValues: (schema: JSONSchema7) => Record<string, unknown>;
   getRequiredFields: (schema: JSONSchema7) => string[];
 }
@@ -175,23 +175,26 @@ export function useSchemaParameters(
     [values, validateValue]
   );
 
-  const reset = useCallback(() => {
-    setValues({});
-    setErrors([]);
-  }, []);
-
   const createEmptyValues = useCallback((schema: JSONSchema7) => {
-    if (typeof schema === "boolean" || !schema.properties) return {};
-
-    return Object.entries(schema.properties).reduce(
-      (acc, [key, prop]) => ({
-        ...acc,
-        [key]:
-          typeof prop === "object" && "default" in prop ? prop.default : "",
-      }),
+    if (!schema.properties) return {};
+    return Object.entries(schema.properties).reduce<Record<string, unknown>>(
+      (acc, [key, prop]) => {
+        if (typeof prop === "object" && "default" in prop) {
+          acc[key] = prop.default;
+        }
+        return acc;
+      },
       {}
     );
   }, []);
+
+  const reset = useCallback(
+    (schema?: JSONSchema7) => {
+      setErrors([]);
+      setValues(schema ? createEmptyValues(schema) : {});
+    },
+    [createEmptyValues]
+  );
 
   const getRequiredFields = useCallback((schema: JSONSchema7): string[] => {
     return Array.isArray(schema.required) ? schema.required : [];

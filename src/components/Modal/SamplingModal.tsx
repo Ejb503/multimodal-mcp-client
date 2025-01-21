@@ -13,6 +13,8 @@ interface SamplingModalProps {
   request: CreateMessageRequest["params"];
   onApprove: (response: CreateMessageResult) => void;
   onReject: () => void;
+
+  serverId: string;
 }
 
 export function SamplingModal({
@@ -21,9 +23,13 @@ export function SamplingModal({
   request,
   onApprove,
   onReject,
+  serverId,
 }: SamplingModalProps) {
   const llmProvider = useGlobalLlm();
   const [isLoading, setIsLoading] = useState(false);
+  // Explicitly mark serverId as intentionally unused
+  void serverId;
+
   const handleSubmit = async () => {
     try {
       setIsLoading(true);

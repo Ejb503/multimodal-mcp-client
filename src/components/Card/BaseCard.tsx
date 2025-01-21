@@ -8,7 +8,7 @@ export interface BaseCardProps {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   headerAction?: React.ReactNode;
-  children: React.ReactNode;
+  children?: React.ReactNode;
   className?: string;
   isLoading?: boolean;
   isEmpty?: boolean;

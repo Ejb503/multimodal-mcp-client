@@ -3,6 +3,8 @@ import { Icon } from "@iconify/react";
 import { CollapsibleSection } from "@/components/Layout/CollapsibleSection";
 
 interface ServerDetailsProps {
+  command: string;
+  args: string[];
   env: string[];
   additionalInfo?: {
     github_link?: string;
@@ -19,6 +21,8 @@ interface ServerDetailsProps {
  * ServerDetails displays detailed server information in a grid layout within a collapsible section
  */
 export function ServerDetails({
+  command,
+  args,
   env,
   additionalInfo,
   className = "",
@@ -34,6 +38,16 @@ export function ServerDetails({
             <div>
               <h5 className="text-sm font-medium">Title</h5>
               <p className="text-sm text-default-600">{additionalInfo.title}</p>
+            </div>
+          )}
+          <div>
+            <h5 className="text-sm font-medium">Command</h5>
+            <p className="text-sm text-default-600">{command}</p>
+          </div>
+          {args.length > 0 && (
+            <div>
+              <h5 className="text-sm font-medium">Arguments</h5>
+              <p className="text-sm text-default-600">{args.join(" ")}</p>
             </div>
           )}
           {additionalInfo?.description && (

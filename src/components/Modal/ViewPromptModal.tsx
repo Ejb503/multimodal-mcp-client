@@ -4,13 +4,12 @@ import type {
   GetPromptResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { PromptModal } from "./PromptModal";
-import { useSchemaParameters } from "@/utils/useSchemaParameters";
 import { getErrorMessage } from "@/features/server/utils/prompt-utils";
-import { useModal } from "@/hooks/useModal";
-import { usePromptLogger } from "@/hooks/usePromptLogger";
-import { useParameters } from "@/utils/useSchemaParameters";
 import { useLogStore } from "@/stores/log-store";
-import { createSchemaFromPromptArgs } from "@/utils/useSchemaParameters";
+import {
+  createSchemaFromPromptArgs,
+  useSchemaParameters,
+} from "@/utils/useSchemaParameters";
 
 interface ViewPromptModalProps {
   isOpen: boolean;
@@ -31,7 +30,12 @@ export function ViewPromptModal({
   const [isLoading, setIsLoading] = React.useState(false);
   const [result, setResult] = React.useState<GetPromptResult>();
   const [error, setError] = React.useState<string>();
-  const { values, errors: validationErrors, setValue, reset } = useParameters();
+  const {
+    values,
+    errors: validationErrors,
+    setValue,
+    reset,
+  } = useSchemaParameters();
   const { addLog } = useLogStore();
 
   React.useEffect(() => {

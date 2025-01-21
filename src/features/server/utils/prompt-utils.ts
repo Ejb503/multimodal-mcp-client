@@ -1,7 +1,5 @@
 import type { JSONSchema7 } from "json-schema";
 import type {
-  Prompt,
-  GetPromptResult,
   PromptMessage,
   JSONRPCError,
 } from "@modelcontextprotocol/sdk/types.js";

@@ -6,7 +6,7 @@ import mcpProxy from "./mcpProxy.js";
 import { ConfigHandlers } from "./handlers/configHandlers.js";
 import { McpHandlers } from "./handlers/mcpHandlers.js";
 import { defaults } from "./config/defaults.js";
-import { checkNpxAvailability, verifyMcpPackage, loadServerConfig, loadUserConfig, } from "./cli/preflight.js";
+import { loadServerConfig, loadUserConfig } from "./cli/preflight.js";
 import { TransportManager } from "./transports/index.js";
 import chalk from "chalk";
 import { validateEnvironmentVariables } from "./cli/preflight.js";
@@ -38,10 +38,8 @@ export class ProxyServer {
         try {
             // First validate environment variables
             await validateEnvironmentVariables();
-            // Get verified npx path and store it in .env
-            const npxInfo = await checkNpxAvailability();
-            await verifyMcpPackage(npxInfo);
-            const config = await loadServerConfig(process.env.SYSTEMPROMPT_API_KEY || "");
+            // Load server configurations
+            const config = await loadServerConfig();
             await loadUserConfig(process.env.SYSTEMPROMPT_API_KEY || "");
             const server = new ProxyServer(config);
             // Handle process signals for cleanup
@@ -85,24 +83,22 @@ export class ProxyServer {
             const backingServerTransport = await this.transportManager.createTransport(req.query);
             const webAppTransport = new SSEServerTransport("/message", res);
             this.transportManager.addWebAppTransport(webAppTransport);
-            console.log("Starting web app transport");
             await webAppTransport.start();
-            console.log("Web app transport started");
             const isConnected = true;
             if (backingServerTransport instanceof StdioClientTransport &&
                 backingServerTransport.stderr) {
                 this.transportManager.setupStderrHandler(backingServerTransport, webAppTransport, isConnected);
             }
+            mcpProxy({
+                transportToClient: webAppTransport,
+                transportToServer: backingServerTransport,
+                onerror: this.transportManager.createErrorHandler(webAppTransport, isConnected),
+            });
             // Send initial ready event through the transport
             webAppTransport.send({
                 jsonrpc: "2.0",
                 method: "connection/ready",
                 params: {},
-            });
-            mcpProxy({
-                transportToClient: webAppTransport,
-                transportToServer: backingServerTransport,
-                onerror: this.transportManager.createErrorHandler(webAppTransport, isConnected),
             });
             req.on("close", () => this.transportManager.removeWebAppTransport(webAppTransport));
         }

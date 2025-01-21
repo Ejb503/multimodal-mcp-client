@@ -1,5 +1,5 @@
 import { SidebarItem } from "@/components/sidebar/types";
-import { ServerMetadata } from "./types";
+import { ServerMetadata, McpConfig, StdioServerConfig } from "./types";
 import { McpData } from "@/contexts/McpDataContext";
 
 /**
@@ -59,4 +59,33 @@ export function getServerNames(mcpData: McpData): Record<string, string> {
     names[id] = getServerConfig(id, mcpData).label;
     return names;
   }, {} as Record<string, string>);
+}
+
+export function getServerType(config: StdioServerConfig): "stdio" | "sse" {
+  return "args" in config ? "stdio" : "sse";
+}
+
+export function getRawServerConfig(
+  id: string,
+  mcpData: McpConfig
+): StdioServerConfig {
+  const serverConfig = mcpData.mcpServers[id];
+  if (!serverConfig) {
+    throw new Error(`No configuration found for server: ${id}`);
+  }
+  return serverConfig;
+}
+
+export function buildServerMetadata(config: StdioServerConfig): ServerMetadata {
+  return {
+    ...config.metadata,
+    color: config.metadata?.color || "secondary",
+  };
+}
+
+export function formatServerLabel(
+  id: string,
+  metadata?: ServerMetadata
+): string {
+  return metadata?.name || `${id.charAt(0).toUpperCase()}${id.slice(1)} Server`;
 }
