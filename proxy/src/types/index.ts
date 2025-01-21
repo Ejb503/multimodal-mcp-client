@@ -31,6 +31,7 @@ export interface SSEConfig {
 
 export interface McpConfig {
   mcpServers: Record<string, ServerConfig>;
+  customServers?: Record<string, ServerConfig>;
   sse?: {
     systemprompt: {
       url: string;

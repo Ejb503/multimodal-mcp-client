@@ -4,6 +4,7 @@ import axios from "axios";
 
 // LLMS: DO NOT CHANGE
 const MCP_SERVER_URL = "http://127.0.0.1";
+const TIMEOUT_MS = 5000;
 
 export class McpHandlers {
   constructor(private config: McpConfig) {}
@@ -14,7 +15,8 @@ export class McpHandlers {
    */
   public async handleGetMcp(req: Request, res: Response): Promise<void> {
     try {
-      const apiKey = process.env.VITE_SYSTEMPROMPT_API_KEY;
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+      console.log(apiKey);
       if (!apiKey) {
         throw new Error("API key not configured");
       }
@@ -22,30 +24,27 @@ export class McpHandlers {
       const response = await axios.get(`${MCP_SERVER_URL}/v1/mcp`, {
         headers: {
           "api-key": apiKey,
-          Authorization: `Bearer ${apiKey}`,
         },
         validateStatus: (status) => status < 500,
+        timeout: TIMEOUT_MS,
       });
 
-      // If the remote server returns unauthorized, return local config
       if (response.status === 401) {
-        res.status(200).json({
-          _warning: "Using local configuration",
-          mcpServers: this.config.mcpServers,
-          defaults: this.config.defaults,
-        });
+        res.status(200).json(this.config);
         return;
       }
 
       res.status(200).json(response.data);
     } catch (error) {
       console.error("Error in GET /v1/mcp:", error);
-      // On error, fallback to local config
-      res.status(200).json({
-        _warning: "Using local configuration (error fallback)",
-        mcpServers: this.config.mcpServers,
-        defaults: this.config.defaults,
-      });
+      if (
+        error instanceof Error &&
+        error.message === "API key not configured"
+      ) {
+        throw error;
+      }
+      // On timeout or other errors, return local config
+      res.status(200).json(this.config);
     }
   }
 
@@ -55,7 +54,7 @@ export class McpHandlers {
    */
   public async handleGetUserMcp(req: Request, res: Response): Promise<void> {
     try {
-      const apiKey = process.env.VITE_SYSTEMPROMPT_API_KEY;
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
       if (!apiKey) {
         throw new Error("API key not configured");
       }
@@ -63,9 +62,9 @@ export class McpHandlers {
       const response = await axios.get(`${MCP_SERVER_URL}/v1/user/mcp`, {
         headers: {
           "api-key": apiKey,
-          Authorization: `Bearer ${apiKey}`,
         },
         validateStatus: (status) => status < 500,
+        timeout: TIMEOUT_MS,
       });
 
       // If remote server returns unauthorized, return default user config
@@ -84,8 +83,14 @@ export class McpHandlers {
       res.status(200).json(response.data);
     } catch (error) {
       console.error("Error in GET /v1/user/mcp:", error);
-      // On error, return default user config
-      const defaultApiKey = process.env.VITE_SYSTEMPROMPT_API_KEY || "";
+      if (
+        error instanceof Error &&
+        error.message === "API key not configured"
+      ) {
+        throw error;
+      }
+      // On timeout or other errors, return default user config
+      const defaultApiKey = process.env.SYSTEMPROMPT_API_KEY || "";
       res.status(200).json({
         user: {
           name: "Default User",
@@ -103,7 +108,8 @@ export class McpHandlers {
    */
   public async handlePostConfigMcp(req: Request, res: Response): Promise<void> {
     try {
-      const apiKey = process.env.VITE_SYSTEMPROMPT_API_KEY;
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+      console.log(apiKey);
       if (!apiKey) {
         throw new Error("API key not configured");
       }
@@ -114,10 +120,10 @@ export class McpHandlers {
         {
           headers: {
             "api-key": apiKey,
-            Authorization: `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
           validateStatus: (status) => status < 500,
+          timeout: TIMEOUT_MS,
         }
       );
 
@@ -128,6 +134,10 @@ export class McpHandlers {
           ...this.config.mcpServers,
           ...req.body.mcpServers,
         },
+        customServers: {
+          ...this.config.customServers,
+          ...req.body.customServers,
+        },
       };
 
       // If remote server returns unauthorized, acknowledge local update
@@ -135,6 +145,8 @@ export class McpHandlers {
         res.status(200).json({
           status: "Configuration updated locally",
           _warning: "Remote update failed - unauthorized",
+          mcpServers: this.config.mcpServers,
+          customServers: this.config.customServers,
         });
         return;
       }
@@ -142,12 +154,20 @@ export class McpHandlers {
       res.status(200).json(response.data);
     } catch (error) {
       console.error("Error in POST /v1/config/mcp:", error);
-      // On error, acknowledge local update
+      if (
+        error instanceof Error &&
+        error.message === "API key not configured"
+      ) {
+        throw error;
+      }
+      // On timeout or other errors, acknowledge local update
       res.status(200).json({
         status: "Configuration updated locally",
         _warning:
           "Remote update failed - " +
           (error instanceof Error ? error.message : "unknown error"),
+        mcpServers: this.config.mcpServers,
+        customServers: this.config.customServers,
       });
     }
   }

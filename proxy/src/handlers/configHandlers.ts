@@ -33,13 +33,18 @@ export class ConfigHandlers {
    */
   public async handleGetLlmConfig(req: Request, res: Response): Promise<void> {
     try {
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+      if (!apiKey) {
+        throw new Error("Systemprompt API key not found in environment");
+      }
+
       res.status(200).json({
         provider: "gemini",
         config: {
-          apiKey: process.env.VITE_GEMINI_API_KEY || "",
+          apiKey,
           model: "gemini-pro",
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: 100000,
         },
       });
     } catch (error) {
@@ -59,6 +64,11 @@ export class ConfigHandlers {
     res: Response
   ): Promise<void> {
     try {
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+      if (!apiKey) {
+        throw new Error("Systemprompt API key not found in environment");
+      }
+
       res.status(200).json({
         agents: [
           {
@@ -70,19 +80,6 @@ export class ConfigHandlers {
             tools: [],
             resources: [],
             dependencies: [],
-            config: {
-              model: "models/gemini-2.0-flash-exp",
-              generationConfig: {
-                responseModalities: "audio",
-                speechConfig: {
-                  voiceConfig: {
-                    prebuiltVoiceConfig: {
-                      voiceName: "Kore",
-                    },
-                  },
-                },
-              },
-            },
           },
         ],
       });

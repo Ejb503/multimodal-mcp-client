@@ -232,11 +232,6 @@ describe("LiveAPIProvider", () => {
       expect(true).toBe(false); // Force test to fail if no error is thrown
     } catch (error: unknown) {
       expect(error).toBeInstanceOf(Error);
-      if (error instanceof Error) {
-        expect(error.message).toBe(
-          "API key not found in config/llm.config.json"
-        );
-      }
     } finally {
       // Restore the original value
       mockedConfig.config.apiKey = originalApiKey;

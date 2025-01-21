@@ -1,26 +1,53 @@
-import { Request, Response } from "express";
+import { Request } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { findActualExecutable } from "spawn-rx";
 import type { McpConfig } from "../types/index.js";
-import mcpProxy from "../mcpProxy.js";
 
-type TransportType = "stdio" | "sse";
-type Transport = StdioClientTransport | SSEClientTransport;
+export type TransportType = "stdio" | "sse";
+export type Transport = StdioClientTransport | SSEClientTransport;
 
-export class TransportHandlers {
+export interface TransportParams {
+  transportType: TransportType;
+  serverId: string;
+}
+
+/**
+ * Maps array-style environment variables to their actual values
+ * @param envConfig The environment configuration object
+ * @param baseEnv Base environment to extend from (optional)
+ * @returns Mapped environment variables
+ */
+export function mapEnvironmentVariables(
+  envConfig: Record<string, unknown> = {},
+  baseEnv: Record<string, string> = process.env as Record<string, string>
+): Record<string, string> {
+  // Start with base environment if provided
+  const env = { ...baseEnv };
+
+  // Map array-style environment variables to their actual values
+  Object.entries(envConfig).forEach(([key, value]) => {
+    if (!isNaN(Number(key)) && typeof value === "string" && baseEnv[value]) {
+      // For array-style env vars, use the env var name as the key
+      env[value] = baseEnv[value];
+    } else if (typeof value === "string") {
+      // For direct key-value pairs
+      env[key] = value;
+    }
+  });
+
+  return env;
+}
+
+export class TransportManager {
   private webAppTransports: SSEServerTransport[] = [];
+  private config: McpConfig;
 
-  constructor(private config: McpConfig) {}
+  constructor(config: McpConfig) {
+    this.config = config;
+  }
 
-  /**
-   * Validates and extracts transport parameters from the request query
-   */
-  private validateTransportParams(query: Request["query"]): {
-    transportType: TransportType;
-    serverId: string;
-  } {
+  public validateTransportParams(query: Request["query"]): TransportParams {
     const serverId =
       typeof query.serverId === "string" ? query.serverId : "default";
     const transportType = query.transportType;
@@ -32,10 +59,7 @@ export class TransportHandlers {
     return { transportType, serverId };
   }
 
-  /**
-   * Creates a transport based on the specified type and server ID
-   */
-  private async createTransport(query: Request["query"]): Promise<Transport> {
+  public async createTransport(query: Request["query"]): Promise<Transport> {
     const { transportType, serverId } = this.validateTransportParams(query);
     console.log(`Creating ${transportType} transport for server ${serverId}`);
 
@@ -46,9 +70,6 @@ export class TransportHandlers {
     return this.createSSETransport(serverId);
   }
 
-  /**
-   * Creates a stdio transport for the specified server
-   */
   private async createStdioTransport(
     serverId: string
   ): Promise<StdioClientTransport> {
@@ -58,17 +79,22 @@ export class TransportHandlers {
     }
 
     console.log(`Setting up stdio transport for server ${serverId}`);
-    const env = serverConfig.env
-      ? { ...(process.env as Record<string, string>), ...serverConfig.env }
-      : (process.env as Record<string, string>);
 
-    const { cmd, args } = findActualExecutable(
-      serverConfig.command,
-      serverConfig.args || []
+    // Map environment variables
+    const env = mapEnvironmentVariables(serverConfig.env);
+
+    // Debug log the mapped environment
+    const mappedEnvOnly = Object.fromEntries(
+      Object.entries(env).filter(
+        ([key]) =>
+          serverConfig.env && Object.values(serverConfig.env).includes(key)
+      )
     );
+    console.log("Server environment:", mappedEnvOnly);
+
     const transport = new StdioClientTransport({
-      command: cmd,
-      args,
+      command: serverConfig.command,
+      args: serverConfig.args || [],
       env,
       stderr: "pipe",
     });
@@ -88,9 +114,6 @@ export class TransportHandlers {
     }
   }
 
-  /**
-   * Creates an SSE transport for the specified server
-   */
   private async createSSETransport(
     serverId: string
   ): Promise<SSEClientTransport> {
@@ -101,13 +124,9 @@ export class TransportHandlers {
     console.log(`Setting up SSE transport for server ${serverId}`);
     const serverConfig = this.config.sse.systemprompt;
     const url = new URL(serverConfig.url);
-    const requestInit: RequestInit = {
-      headers: {
-        "api-key": process.env.SYSTEMPROMPT_API_KEY || "",
-      },
-    };
+    url.searchParams.set("apiKey", serverConfig.apiKey);
 
-    const transport = new SSEClientTransport(url, { requestInit });
+    const transport = new SSEClientTransport(url);
     try {
       await transport.start();
       console.log(`SSE transport started successfully for server ${serverId}`);
@@ -121,10 +140,7 @@ export class TransportHandlers {
     }
   }
 
-  /**
-   * Sets up the stderr handler for stdio transports
-   */
-  private setupStderrHandler(
+  public setupStderrHandler(
     backingServerTransport: StdioClientTransport,
     webAppTransport: SSEServerTransport,
     isConnected: boolean
@@ -147,15 +163,11 @@ export class TransportHandlers {
         }
       } catch (error) {
         console.error("Error sending stderr data:", error);
-        isConnected = false;
       }
     });
   }
 
-  /**
-   * Creates an error handler for the MCP proxy
-   */
-  private createErrorHandler(
+  public createErrorHandler(
     webAppTransport: SSEServerTransport,
     isConnected: boolean
   ) {
@@ -173,105 +185,26 @@ export class TransportHandlers {
         }
       } catch (sendError) {
         console.error("Error sending error notification:", sendError);
-        isConnected = false;
       }
     };
   }
 
-  /**
-   * Handles connection close events
-   */
-  private handleConnectionClose(webAppTransport: SSEServerTransport): void {
-    const index = this.webAppTransports.indexOf(webAppTransport);
+  public addWebAppTransport(transport: SSEServerTransport): void {
+    this.webAppTransports.push(transport);
+  }
+
+  public removeWebAppTransport(transport: SSEServerTransport): void {
+    const index = this.webAppTransports.indexOf(transport);
     if (index > -1) {
       this.webAppTransports.splice(index, 1);
       console.log("Web app transport removed");
     }
   }
 
-  /**
-   * Handles SSE connection requests
-   */
-  public async handleSSE(req: Request, res: Response): Promise<void> {
-    try {
-      const backingServerTransport = await this.createTransport(req.query);
-      const webAppTransport = new SSEServerTransport("/message", res);
-
-      this.webAppTransports.push(webAppTransport);
-      console.log("Starting web app transport");
-      await webAppTransport.start();
-      console.log("Web app transport started");
-
-      const isConnected = true;
-
-      if (
-        backingServerTransport instanceof StdioClientTransport &&
-        backingServerTransport.stderr
-      ) {
-        this.setupStderrHandler(
-          backingServerTransport,
-          webAppTransport,
-          isConnected
-        );
-      }
-
-      // Send initial ready event through the transport
-      webAppTransport.send({
-        jsonrpc: "2.0",
-        method: "connection/ready",
-        params: {},
-      });
-
-      mcpProxy({
-        transportToClient: webAppTransport,
-        transportToServer: backingServerTransport,
-        onerror: this.createErrorHandler(webAppTransport, isConnected),
-      });
-
-      req.on("close", () => this.handleConnectionClose(webAppTransport));
-    } catch (error) {
-      console.error("Error in /sse route:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          error:
-            error instanceof Error ? error.message : "Internal server error",
-        });
-      }
-    }
-  }
-
-  /**
-   * Handles message requests from clients
-   */
-  public async handleMessage(req: Request, res: Response): Promise<void> {
-    try {
-      const sessionId = req.query.sessionId;
-      if (typeof sessionId !== "string") {
-        res.status(400).end("Session ID must be specified");
-        return;
-      }
-
-      const transport = this.webAppTransports.find(
-        (t) => t.sessionId === sessionId
-      );
-      if (!transport) {
-        res.status(404).end("Session not found");
-        return;
-      }
-
-      await transport.handlePostMessage(req, res);
-      if (!res.headersSent) {
-        res.status(200).end();
-      }
-    } catch (error) {
-      console.error("Error in /message route:", error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          error:
-            error instanceof Error ? error.message : "Internal server error",
-        });
-      }
-    }
+  public findWebAppTransport(
+    sessionId: string
+  ): SSEServerTransport | undefined {
+    return this.webAppTransports.find((t) => t.sessionId === sessionId);
   }
 
   public async cleanup(): Promise<void> {

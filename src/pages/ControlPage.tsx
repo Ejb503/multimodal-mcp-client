@@ -57,7 +57,7 @@ export default function ControlPage() {
     ...Object.keys(mcpData.customServers || {}),
   ]);
 
-  // Sort available servers: installed first, then alphabetically
+  console.log(mcpData);
   const availableServers = Object.entries(mcpData.available).sort(
     ([keyA], [keyB]) => {
       const isInstalledA = installedServerIds.has(keyA);

@@ -288,6 +288,7 @@ export async function generateLlmResponse(
     const result = await model.generateContent(formattedMessages);
     const response = await result.response;
     const text = response.text().trim();
+    console.log("Gemini Response", text);
 
     return processResponse(text, responseType, model, formattedMessages);
   } catch (error) {

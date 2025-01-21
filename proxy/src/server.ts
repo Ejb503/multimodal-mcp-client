@@ -2,16 +2,20 @@ import cors from "cors";
 import express, { Express, Request, Response } from "express";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { findActualExecutable } from "spawn-rx";
 import type { McpConfig } from "./types/index.js";
 import mcpProxy from "./mcpProxy.js";
 import { ConfigHandlers } from "./handlers/configHandlers.js";
 import { McpHandlers } from "./handlers/mcpHandlers.js";
 import { defaults } from "./config/defaults.js";
-
-type TransportType = "stdio" | "sse";
-type Transport = StdioClientTransport | SSEClientTransport;
+import {
+  checkNpxAvailability,
+  verifyMcpPackage,
+  loadServerConfig,
+  loadUserConfig,
+} from "./cli/preflight.js";
+import { TransportManager } from "./transports/index.js";
+import chalk from "chalk";
+import { validateEnvironmentVariables } from "./cli/preflight.js";
 
 /**
  * ProxyServer acts as a bridge between web applications and MCP servers.
@@ -19,21 +23,66 @@ type Transport = StdioClientTransport | SSEClientTransport;
  */
 export class ProxyServer {
   private app: Express;
-  private webAppTransports: SSEServerTransport[] = [];
-  private config: McpConfig;
+  private transportManager: TransportManager;
   private configHandlers: ConfigHandlers;
   private mcpHandlers: McpHandlers;
+  private server: ReturnType<Express["listen"]> | null = null;
+  private isShuttingDown = false;
 
   constructor(config: McpConfig) {
-    this.config = {
+    const fullConfig = {
       ...config,
       defaults,
     };
+
     this.app = express();
-    this.configHandlers = new ConfigHandlers(this.config);
-    this.mcpHandlers = new McpHandlers(this.config);
+    this.transportManager = new TransportManager(fullConfig);
+    this.configHandlers = new ConfigHandlers(fullConfig);
+    this.mcpHandlers = new McpHandlers(fullConfig);
+
     this.setupMiddleware();
     this.setupRoutes();
+  }
+
+  /**
+   * Creates a new ProxyServer instance with config file checking
+   * @param config Initial configuration
+   * @returns Promise that resolves to a new ProxyServer instance
+   */
+  public static async create(): Promise<ProxyServer> {
+    try {
+      // First validate environment variables
+      await validateEnvironmentVariables();
+
+      // Get verified npx path and store it in .env
+      const npxInfo = await checkNpxAvailability();
+      await verifyMcpPackage(npxInfo);
+      const config = await loadServerConfig(
+        process.env.SYSTEMPROMPT_API_KEY || ""
+      );
+      await loadUserConfig(process.env.SYSTEMPROMPT_API_KEY || "");
+
+      const server = new ProxyServer(config);
+
+      // Handle process signals for cleanup
+      const cleanup = async () => {
+        if (server.isShuttingDown) return;
+        console.log("\nGracefully shutting down...");
+        server.isShuttingDown = true;
+        await server.cleanup();
+        process.exit(0); // Exit after cleanup since this is a SIGINT/SIGTERM
+      };
+
+      // Handle both SIGINT (Ctrl+C) and SIGTERM
+      process.once("SIGINT", cleanup);
+      process.once("SIGTERM", cleanup);
+
+      return server;
+    } catch (error) {
+      // If CLI setup fails, log error and exit immediately
+      console.error("\n❌ Failed during CLI setup:", error);
+      process.exit(1);
+    }
   }
 
   private setupMiddleware(): void {
@@ -79,132 +128,13 @@ export class ProxyServer {
     );
   }
 
-  /**
-   * Validates and extracts transport parameters from the request query
-   * @param query - The request query
-   * @returns The validated transport type and server ID
-   * @throws Error if parameters are invalid
-   */
-  private validateTransportParams(query: Request["query"]): {
-    transportType: TransportType;
-    serverId: string;
-  } {
-    const serverId =
-      typeof query.serverId === "string" ? query.serverId : "default";
-    const transportType = query.transportType;
-
-    if (transportType !== "stdio" && transportType !== "sse") {
-      throw new Error("Invalid transport type specified");
-    }
-
-    return { transportType, serverId };
-  }
-
-  /**
-   * Creates a transport based on the specified type and server ID
-   * @param query - The request query containing transportType and serverId
-   * @returns A promise that resolves to the created transport
-   * @throws Error if the configuration is invalid or transport creation fails
-   */
-  private async createTransport(query: Request["query"]): Promise<Transport> {
-    const { transportType, serverId } = this.validateTransportParams(query);
-    console.log(`Creating ${transportType} transport for server ${serverId}`);
-
-    if (transportType === "stdio") {
-      return this.createStdioTransport(serverId);
-    }
-
-    return this.createSSETransport(serverId);
-  }
-
-  /**
-   * Creates a stdio transport for the specified server
-   * @param serverId - The ID of the server to connect to
-   * @returns A promise that resolves to the created transport
-   * @throws Error if the configuration is invalid or transport creation fails
-   */
-  private async createStdioTransport(
-    serverId: string
-  ): Promise<StdioClientTransport> {
-    const serverConfig = this.config.mcpServers[serverId];
-    if (!serverConfig) {
-      throw new Error(`No configuration found for server: ${serverId}`);
-    }
-
-    console.log(`Setting up stdio transport for server ${serverId}`);
-    const env = serverConfig.env
-      ? { ...(process.env as Record<string, string>), ...serverConfig.env }
-      : (process.env as Record<string, string>);
-
-    const { cmd, args } = findActualExecutable(
-      serverConfig.command,
-      serverConfig.args || []
-    );
-    const transport = new StdioClientTransport({
-      command: cmd,
-      args,
-      env,
-      stderr: "pipe",
-    });
-
-    try {
-      await transport.start();
-      console.log(
-        `Stdio transport started successfully for server ${serverId}`
-      );
-      return transport;
-    } catch (error) {
-      console.error(
-        `Failed to start stdio transport for server ${serverId}:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Creates an SSE transport for the specified server
-   * @param serverId - The ID of the server to connect to
-   * @returns A promise that resolves to the created transport
-   * @throws Error if the configuration is invalid or transport creation fails
-   */
-  private async createSSETransport(
-    serverId: string
-  ): Promise<SSEClientTransport> {
-    if (!this.config.sse?.systemprompt) {
-      throw new Error(`SSE configuration is not available`);
-    }
-
-    console.log(`Setting up SSE transport for server ${serverId}`);
-    const serverConfig = this.config.sse.systemprompt;
-    const url = new URL(serverConfig.url);
-    url.searchParams.set("apiKey", serverConfig.apiKey);
-
-    const transport = new SSEClientTransport(url);
-    try {
-      await transport.start();
-      console.log(`SSE transport started successfully for server ${serverId}`);
-      return transport;
-    } catch (error) {
-      console.error(
-        `Failed to start SSE transport for server ${serverId}:`,
-        error
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * Handles SSE connection requests
-   * @param req - The express request object
-   * @param res - The express response object
-   */
   private async handleSSE(req: Request, res: Response): Promise<void> {
     try {
-      const backingServerTransport = await this.createTransport(req.query);
+      const backingServerTransport =
+        await this.transportManager.createTransport(req.query);
       const webAppTransport = new SSEServerTransport("/message", res);
 
-      this.webAppTransports.push(webAppTransport);
+      this.transportManager.addWebAppTransport(webAppTransport);
       console.log("Starting web app transport");
       await webAppTransport.start();
       console.log("Web app transport started");
@@ -215,7 +145,7 @@ export class ProxyServer {
         backingServerTransport instanceof StdioClientTransport &&
         backingServerTransport.stderr
       ) {
-        this.setupStderrHandler(
+        this.transportManager.setupStderrHandler(
           backingServerTransport,
           webAppTransport,
           isConnected
@@ -232,10 +162,15 @@ export class ProxyServer {
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: backingServerTransport,
-        onerror: this.createErrorHandler(webAppTransport, isConnected),
+        onerror: this.transportManager.createErrorHandler(
+          webAppTransport,
+          isConnected
+        ),
       });
 
-      req.on("close", () => this.handleConnectionClose(webAppTransport));
+      req.on("close", () =>
+        this.transportManager.removeWebAppTransport(webAppTransport)
+      );
     } catch (error) {
       console.error("Error in /sse route:", error);
       if (!res.headersSent) {
@@ -247,79 +182,6 @@ export class ProxyServer {
     }
   }
 
-  /**
-   * Sets up the stderr handler for stdio transports
-   */
-  private setupStderrHandler(
-    backingServerTransport: StdioClientTransport,
-    webAppTransport: SSEServerTransport,
-    isConnected: boolean
-  ): void {
-    if (!backingServerTransport.stderr) {
-      console.warn("No stderr available for stdio transport");
-      return;
-    }
-
-    backingServerTransport.stderr.on("data", (chunk) => {
-      try {
-        if (isConnected) {
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/stderr",
-            params: {
-              content: chunk.toString(),
-            },
-          });
-        }
-      } catch (error) {
-        console.error("Error sending stderr data:", error);
-        isConnected = false;
-      }
-    });
-  }
-
-  /**
-   * Creates an error handler for the MCP proxy
-   */
-  private createErrorHandler(
-    webAppTransport: SSEServerTransport,
-    isConnected: boolean
-  ) {
-    return (error: Error) => {
-      console.error("MCP proxy error:", error);
-      try {
-        if (isConnected) {
-          webAppTransport.send({
-            jsonrpc: "2.0",
-            method: "notifications/error",
-            params: {
-              error: error.message || "Unknown error occurred",
-            },
-          });
-        }
-      } catch (sendError) {
-        console.error("Error sending error notification:", sendError);
-        isConnected = false;
-      }
-    };
-  }
-
-  /**
-   * Handles connection close events
-   */
-  private handleConnectionClose(webAppTransport: SSEServerTransport): void {
-    const index = this.webAppTransports.indexOf(webAppTransport);
-    if (index > -1) {
-      this.webAppTransports.splice(index, 1);
-      console.log("Web app transport removed");
-    }
-  }
-
-  /**
-   * Handles message requests from clients
-   * @param req - The express request object
-   * @param res - The express response object
-   */
   private async handleMessage(req: Request, res: Response): Promise<void> {
     try {
       const sessionId = req.query.sessionId;
@@ -328,9 +190,7 @@ export class ProxyServer {
         return;
       }
 
-      const transport = this.webAppTransports.find(
-        (t) => t.sessionId === sessionId
-      );
+      const transport = this.transportManager.findWebAppTransport(sessionId);
       if (!transport) {
         res.status(404).end("Session not found");
         return;
@@ -351,35 +211,87 @@ export class ProxyServer {
     }
   }
 
-  /**
-   * Starts the proxy server on the specified port
-   * @param port - The port number to listen on
-   */
   public async startServer(port: number): Promise<void> {
-    return new Promise((resolve) => {
-      this.app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
-        console.log("\nAvailable MCP Servers:");
-        Object.entries(this.config.mcpServers).forEach(([id, config]) => {
-          console.log(`\n${id}:`);
-          if (config.env) {
-            Object.keys(config.env).forEach((key) => {
-              console.log(`    ${key}: [HIDDEN]`);
-            });
-          }
-        });
+    const maxRetries = 10;
+    const startPort = port;
 
-        if (this.config.sse) {
-          console.log("\nSSE Endpoints:");
-          Object.entries(this.config.sse).forEach(([id, config]) => {
-            console.log(`\n${id}:`);
-            console.log(`  URL: ${config.url}`);
-            console.log(`  API Key: [HIDDEN]`);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const currentPort = startPort + attempt;
+        await new Promise<void>((resolve, reject) => {
+          if (this.server) {
+            this.server.close();
+          }
+
+          this.server = this.app.listen(currentPort, () => {
+            const boxWidth = 60;
+            const message = `Server running on port ${currentPort}`;
+            const padding = Math.max(0, boxWidth - message.length - 2);
+            const leftPad = Math.floor(padding / 2);
+            const rightPad = padding - leftPad;
+
+            console.log(chalk.cyan("\n┌" + "─".repeat(boxWidth) + "┐"));
+            console.log(
+              chalk.cyan("│") +
+                " ".repeat(leftPad) +
+                chalk.green(message) +
+                " ".repeat(rightPad) +
+                chalk.cyan("│")
+            );
+            console.log(chalk.cyan("└" + "─".repeat(boxWidth) + "┘\n"));
+
+            // Print welcome message after server is ready
+            console.log(chalk.bold("\n🎉 Welcome to Systemprompt!"));
+            console.log(chalk.gray("Your AI assistant is ready to help.\n"));
+
+            // Print quick start guide
+            console.log(chalk.yellow("Quick Start:"));
+            console.log(
+              chalk.gray("• Open your browser to:"),
+              chalk.cyan(`http://localhost:${currentPort}`)
+            );
+            console.log(
+              chalk.gray("• Press"),
+              chalk.cyan("Ctrl+C"),
+              chalk.gray("to stop the server")
+            );
+            console.log(
+              chalk.gray("• View logs below for real-time updates\n")
+            );
+
+            console.log(chalk.dim("─".repeat(boxWidth)));
+            console.log(chalk.dim("Server Logs:"));
+            resolve();
           });
+
+          this.server.on("error", (err: NodeJS.ErrnoException) => {
+            if (err.code === "EADDRINUSE") {
+              console.log(
+                chalk.yellow(
+                  `Port ${currentPort} is in use, trying next port...`
+                )
+              );
+              this.server?.close();
+              this.server = null;
+            }
+            reject(err);
+          });
+        });
+        return; // Successfully started server
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (this.server) {
+          this.server.close();
+          this.server = null;
         }
-        resolve();
-      });
-    });
+        if (attempt === maxRetries - 1) {
+          throw new Error(
+            `Failed to start server after ${maxRetries} attempts. Last error: ${error.message}`
+          );
+        }
+        // Continue to next attempt if not the last try
+      }
+    }
   }
 
   public getExpressApp(): Express {
@@ -387,17 +299,36 @@ export class ProxyServer {
   }
 
   public async cleanup(): Promise<void> {
-    console.log("Cleaning up server resources...");
-    await Promise.all(
-      this.webAppTransports.map(async (transport) => {
-        try {
-          await transport.close?.();
-        } catch (error) {
-          console.error("Error closing transport:", error);
-        }
-      })
-    );
-    this.webAppTransports = [];
-    console.log("Cleanup complete");
+    if (this.isShuttingDown) return;
+
+    console.log(chalk.yellow("\n\nGracefully shutting down..."));
+    console.log(chalk.dim("─".repeat(60)));
+
+    console.log(chalk.gray("• Cleaning up server resources..."));
+    if (this.server) {
+      await new Promise<void>((resolve) => {
+        // Force close any remaining connections
+        this.server?.close(() => {
+          // Destroy any remaining sockets
+          this.server?.getConnections((err, count) => {
+            if (!err && count > 0) {
+              console.log(
+                chalk.gray(`• Closing ${count} remaining connections...`)
+              );
+              // @ts-expect-error Server internals needed for cleanup
+              const connections = this.server?._connections as Set<
+                import("net").Socket
+              >;
+              connections?.forEach((socket) => socket.destroy());
+            }
+            resolve();
+          });
+        });
+      });
+      this.server = null;
+    }
+    await this.transportManager.cleanup();
+    console.log(chalk.gray("• Cleanup complete"));
+    console.log(chalk.green("\n👋 Thank you for using Systemprompt!\n"));
   }
 }

@@ -2,7 +2,6 @@ import { ContentModal } from "./ContentModal";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-  TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useState } from "react";
 import { useGlobalLlm } from "@/contexts/LlmProviderContext";
@@ -24,17 +23,7 @@ export function SamplingModal({
   onReject,
 }: SamplingModalProps) {
   const llmProvider = useGlobalLlm();
-  const [progress] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
-  const [response, setResponse] = useState<CreateMessageResult>({
-    role: "assistant",
-    content: {
-      type: "text",
-      text: "",
-    } as TextContent,
-    model: "",
-  });
-
   const handleSubmit = async () => {
     try {
       setIsLoading(true);
@@ -49,7 +38,7 @@ export function SamplingModal({
         },
         _meta: request._meta as McpMeta,
       });
-
+      console.log("LLM Result", result);
       // Create response object
       const response: CreateMessageResult = {
         role: "assistant",
@@ -60,8 +49,6 @@ export function SamplingModal({
         model: "mcp-sampling",
       };
 
-      // Update local state and approve
-      setResponse(response);
       onApprove(response);
     } catch (error) {
       console.error("Failed to execute sampling:", error);
@@ -94,40 +81,6 @@ export function SamplingModal({
         responseSchema: request._meta?.responseSchema
           ? JSON.stringify(request._meta.responseSchema, null, 2)
           : undefined,
-      },
-    },
-    {
-      title: "Response",
-      content: {
-        text: (response.content as TextContent).text,
-        model: response.model,
-      },
-      isForm: true,
-      onValueChange: (key: string, value: unknown) => {
-        if (key === "text") {
-          setResponse((prev) => ({
-            ...prev,
-            content: {
-              type: "text",
-              text: value as string,
-            },
-          }));
-        } else if (key === "model") {
-          setResponse((prev) => ({
-            ...prev,
-            model: value as string,
-          }));
-        }
-      },
-      values: {
-        text: (response.content as TextContent).text,
-        model: response.model,
-      },
-    },
-    {
-      title: "Status",
-      content: {
-        progress: progress || "Waiting for execution...",
       },
     },
   ];
