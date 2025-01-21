@@ -54,12 +54,8 @@ export class ProxyServer {
       // First validate environment variables
       await validateEnvironmentVariables();
 
-      // Get verified npx path and store it in .env
-      const npxInfo = await checkNpxAvailability();
-      await verifyMcpPackage(npxInfo);
-      const config = await loadServerConfig(
-        process.env.SYSTEMPROMPT_API_KEY || ""
-      );
+      // Load server configurations
+      const config = await loadServerConfig();
       await loadUserConfig(process.env.SYSTEMPROMPT_API_KEY || "");
 
       const server = new ProxyServer(config);
@@ -135,9 +131,7 @@ export class ProxyServer {
       const webAppTransport = new SSEServerTransport("/message", res);
 
       this.transportManager.addWebAppTransport(webAppTransport);
-      console.log("Starting web app transport");
       await webAppTransport.start();
-      console.log("Web app transport started");
 
       const isConnected = true;
 
@@ -152,13 +146,6 @@ export class ProxyServer {
         );
       }
 
-      // Send initial ready event through the transport
-      webAppTransport.send({
-        jsonrpc: "2.0",
-        method: "connection/ready",
-        params: {},
-      });
-
       mcpProxy({
         transportToClient: webAppTransport,
         transportToServer: backingServerTransport,
@@ -166,6 +153,13 @@ export class ProxyServer {
           webAppTransport,
           isConnected
         ),
+      });
+
+      // Send initial ready event through the transport
+      webAppTransport.send({
+        jsonrpc: "2.0",
+        method: "connection/ready",
+        params: {},
       });
 
       req.on("close", () =>
