@@ -20,7 +20,7 @@ export function ServerCard({
       iconTestId={`server-icon-${isConnected ? "connected" : "disconnected"}`}
       title={
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">{serverName}</h1>
+          <h1 className="text-2xl ">{serverName}</h1>
         </div>
       }
       subtitle={

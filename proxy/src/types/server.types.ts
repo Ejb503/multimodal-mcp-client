@@ -1,3 +1,5 @@
+import { SystempromptModule } from "./systemprompt.js";
+
 export interface ServerMetadata {
   icon?: string;
   color?: string;
@@ -46,4 +48,19 @@ export interface ServerResponse {
   customServers: Record<string, ServerConfig>;
   available: Record<string, unknown>;
   defaults: ServerDefaults;
+}
+
+export interface McpServer extends ServerConfig {
+  id?: string;
+  type?: string;
+  title?: string;
+  description?: string;
+  environment?: string[];
+  metadata: ServerMetadata & Partial<McpModuleMetadata>;
+}
+
+export interface McpDataInterface {
+  mcpServers: Record<string, McpServer>;
+  defaults: ServerDefaults;
+  available: Record<string, SystempromptModule>;
 }

@@ -6,10 +6,11 @@ import { McpContext } from "../../../contexts/McpContext";
 import type {
   McpClientState,
   McpContextType,
-} from "../../../contexts/McpContext.types";
+} from "../../../types/McpContext.types";
 import { McpDataProvider } from "../../../contexts/McpDataContext";
 import { GlobalLlmProvider } from "../../../contexts/LlmProviderContext";
 import { LlmRegistryProvider } from "../../../features/llm-registry/contexts/LlmRegistryContext";
+import type { ServerConfig } from "../../../types/server.types";
 
 // Mock modules
 const mockNavigate = vi.fn();
@@ -52,6 +53,7 @@ const mockConfig = {
     "systemprompt-dev": {
       command: "npx",
       args: [],
+      env: {},
       metadata: {
         icon: "solar:programming-line-duotone",
         color: "success" as const,
@@ -62,6 +64,7 @@ const mockConfig = {
     "systemprompt-agent-server": {
       command: "npx",
       args: [],
+      env: {},
       metadata: {
         icon: "solar:programming-line-duotone",
         color: "success" as const,
@@ -78,15 +81,9 @@ vi.mock("../../../config/mcp.config.json", () => ({
 
 vi.mock("../../../contexts/McpDataContext", () => ({
   McpDataProvider: ({ children }: { children: React.ReactNode }) => children,
-  useMcpData: () => ({
-    mcpData: {
-      mcpServers: mockConfig.mcpServers,
-      available: {},
-      defaults: mockConfig.defaults,
-    },
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
+  useMcpServerData: () => ({
+    mcpServers: mockConfig.mcpServers as Record<string, ServerConfig>,
+    defaults: mockConfig.defaults,
   }),
 }));
 

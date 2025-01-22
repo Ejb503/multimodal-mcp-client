@@ -23,7 +23,7 @@ export function PageHeader({
         <div className="flex items-center gap-3 mb-2">
           {icon}
           {typeof title === "string" ? (
-            <h1 className="text-2xl font-bold">{title}</h1>
+            <h1 className="text-2xl ">{title}</h1>
           ) : (
             title
           )}

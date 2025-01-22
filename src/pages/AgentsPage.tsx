@@ -181,7 +181,7 @@ export default function AgentGalleryPage() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Agent Gallery</h1>
+          <h1 className="text-2xl ">Agent Gallery</h1>
           <p className="text-small text-default-500">
             Manage and interact with your AI agents
           </p>

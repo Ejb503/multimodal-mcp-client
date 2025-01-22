@@ -2,18 +2,18 @@ import { SidebarSection, SidebarItem } from "./types";
 import { useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { McpContext } from "../../contexts/McpContext";
-import { useMcpData } from "../../contexts/McpDataContext";
-import { McpServerConfig } from "../../types";
+import { useMcpServerData } from "@/contexts/McpDataContext";
+import { ServerConfig } from "@/types/server.types";
 
 type SidebarItemColor = "primary" | "success" | "warning" | "secondary";
 
 export function useSidebarItems() {
   const navigate = useNavigate();
   const context = useContext(McpContext);
-  const { mcpData } = useMcpData();
+  const state = useMcpServerData();
 
   if (!context) throw new Error("McpContext must be used within McpProvider");
-  if (!mcpData) return { sections: [], handleItemClick: () => {} };
+  if (!state) return { sections: [], handleItemClick: () => {} };
 
   const { clients } = context;
 
@@ -22,7 +22,7 @@ export function useSidebarItems() {
   };
 
   const getServerItems = (
-    servers: Record<string, McpServerConfig>,
+    servers: Record<string, ServerConfig>,
     isCustom: boolean = false
   ): SidebarItem[] => {
     return Object.entries(servers || {}).map(([id, config]) => {
@@ -34,24 +34,24 @@ export function useSidebarItems() {
           ? {
               icon:
                 config.metadata.icon ||
-                mcpData.defaults?.serverTypes?.stdio?.icon ||
+                state.defaults?.serverTypes?.stdio?.icon ||
                 "solar:server-square-line-duotone",
               color:
                 config.metadata.color ||
-                mcpData.defaults?.serverTypes?.stdio?.color ||
+                state.defaults?.serverTypes?.stdio?.color ||
                 "secondary",
               description:
                 config.metadata.description ||
-                mcpData.defaults?.serverTypes?.stdio?.description ||
+                state.defaults?.serverTypes?.stdio?.description ||
                 "Local stdio-based MCP server",
             }
           : {
               icon:
-                mcpData.defaults?.unconnected?.icon ||
+                state.defaults?.unconnected?.icon ||
                 "solar:server-square-line-duotone",
-              color: mcpData.defaults?.unconnected?.color || "secondary",
+              color: state.defaults?.unconnected?.color || "secondary",
               description:
-                mcpData.defaults?.unconnected?.description ||
+                state.defaults?.unconnected?.description ||
                 "Disconnected server",
             };
 
@@ -102,17 +102,11 @@ export function useSidebarItems() {
     },
   ];
 
-  const coreServers = getServerItems(mcpData.mcpServers);
-  const customServers = getServerItems(mcpData.customServers || {}, true);
+  const coreServers = getServerItems(state.mcpServers);
 
   if (coreServers.length > 0) {
     sections.push({ title: "Core Servers", items: coreServers });
   }
-
-  if (customServers.length > 0) {
-    sections.push({ title: "Custom Servers", items: customServers });
-  }
-
   sections.push({
     title: "Settings",
     items: [

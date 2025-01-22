@@ -5,7 +5,7 @@
  * @see McpProvider.tsx for the implementation
  */
 import { createContext, useContext } from "react";
-import type { McpContextType } from "./McpContext.types";
+import type { McpContextType } from "../types/McpContext.types";
 
 // Re-export the types
 export type { McpContextType };

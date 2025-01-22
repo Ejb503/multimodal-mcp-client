@@ -1,147 +1,96 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { ServerMetadata, StdioServerConfig } from "../../config/types";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
+import { SystempromptUser } from "@/types/systemprompt";
+import { McpData } from "@/types/server.types";
 
-interface McpUser {
-  user: {
-    name: string;
-    email: string;
-    roles: string[];
-  };
-  billing: null;
-  api_key: string;
-}
-
-interface AvailableServer {
-  id: string;
-  title: string;
-  content: string;
-  description: string;
-  environment_variables: string[];
-  github_link: string;
-  icon: string;
-  npm_link: string;
-  block: null;
-  prompt: null;
-}
-
-interface ServerDefaults {
-  serverTypes: {
-    stdio: ServerMetadata;
-  };
-  unconnected: ServerMetadata;
-}
-
-export interface McpData {
-  mcpServers: Record<string, StdioServerConfig>;
-  customServers?: Record<string, StdioServerConfig>;
-  available: Record<string, AvailableServer>;
-  defaults: ServerDefaults;
-}
+type McpDataState =
+  | { status: "loading" }
+  | { status: "error"; error: Error }
+  | { status: "success"; user: SystempromptUser; mcpData: McpData };
 
 interface McpDataContextType {
-  user: McpUser | null;
-  mcpData: McpData | null;
-  isLoading: boolean;
-  error: Error | null;
+  state: McpDataState;
   refetch: () => Promise<void>;
 }
 
 const McpDataContext = createContext<McpDataContextType | null>(null);
 
-const fetchUserData = async () => {
-  const response = await fetch("/v1/user/mcp", {
+async function fetchJson<T>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
+      ...options.headers,
     },
   });
-  const data = await response.json();
-  if (data.error) {
-    throw new Error(data.error);
-  }
-  return data;
-};
 
-const fetchMcpData = async () => {
-  const response = await fetch("/v1/mcp", {
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
   const data = await response.json();
   if (data.error) {
     throw new Error(data.error);
   }
+
   return data;
+}
+
+const api = {
+  async fetchUserData(): Promise<SystempromptUser> {
+    return fetchJson<SystempromptUser>("/v1/user/mcp");
+  },
+  async fetchMcpData(): Promise<McpData> {
+    return fetchJson<McpData>("/v1/mcp");
+  },
 };
 
 export function McpDataProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<McpUser | null>(null);
-  const [mcpData, setMcpData] = useState<McpData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [state, setState] = useState<McpDataState>({ status: "loading" });
 
-  const fetchData = async () => {
-    setIsLoading(true);
-    setError(null);
+  const fetchData = useCallback(async () => {
+    setState({ status: "loading" });
+
     try {
-      // Fetch user data first
-      const userData = await fetchUserData();
-      console.log("User data received:", userData);
-      setUser(userData);
+      // Fetch user and MCP data in parallel
+      const [userData, mcpData] = await Promise.all([
+        api.fetchUserData(),
+        api.fetchMcpData(),
+      ]);
 
-      // Only fetch MCP data if we have valid user data
-      if (userData) {
-        const mcpData = await fetchMcpData();
-        console.log("MCP data received:", mcpData);
-        console.log("Servers received:", Object.keys(mcpData.mcpServers || {}));
-        console.log(
-          "Custom servers received:",
-          Object.keys(mcpData.customServers || {})
-        );
-
-        // Update mcp.config.json with the server configuration
-        try {
-          await fetch("/v1/config/mcp", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              mcpServers: mcpData.mcpServers,
-              customServers: mcpData.customServers || {},
-            }),
-          });
-          console.log("Successfully updated mcp.config.json");
-        } catch (configError) {
-          console.error("Failed to update mcp.config.json:", configError);
-        }
-
-        setMcpData(mcpData);
-      }
-    } catch (err) {
-      console.error("Error fetching data:", err);
-      setError(err instanceof Error ? err : new Error("An error occurred"));
-    } finally {
-      setIsLoading(false);
+      // Update state with the fetched data
+      setState({
+        status: "success",
+        user: userData,
+        mcpData,
+      });
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setState({
+        status: "error",
+        error: error instanceof Error ? error : new Error("An error occurred"),
+      });
     }
-  };
-
-  useEffect(() => {
-    fetchData();
   }, []);
 
-  const refetch = async () => {
-    await fetchData();
-  };
+  // Initial fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return (
     <McpDataContext.Provider
       value={{
-        user,
-        mcpData,
-        isLoading,
-        error,
-        refetch,
+        state,
+        refetch: fetchData,
       }}
     >
       {children}
@@ -155,4 +104,21 @@ export function useMcpData() {
     throw new Error("useMcpData must be used within a McpDataProvider");
   }
   return context;
+}
+
+// Helper hooks for common data access patterns
+export function useMcpUser() {
+  const { state } = useMcpData();
+  if (state.status !== "success") {
+    throw new Error("Cannot access user data while loading or in error state");
+  }
+  return state.user;
+}
+
+export function useMcpServerData() {
+  const { state } = useMcpData();
+  if (state.status !== "success") {
+    throw new Error("Cannot access MCP data while loading or in error state");
+  }
+  return state.mcpData;
 }

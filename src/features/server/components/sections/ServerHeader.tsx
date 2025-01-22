@@ -1,5 +1,5 @@
-import { BaseCard } from "@/components/Card/BaseCard";
-import { ConnectButton } from "@/components/Button";
+import { Button } from "@nextui-org/react";
+import { Icon } from "@iconify/react";
 
 interface ServerHeaderProps {
   serverName: string;
@@ -9,6 +9,7 @@ interface ServerHeaderProps {
   hasError: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
+  icon?: string;
 }
 
 export function ServerHeader({
@@ -16,44 +17,45 @@ export function ServerHeader({
   serverId,
   isConnected,
   isConnecting,
+  icon = "solar:server-bold-duotone",
   onConnect,
   onDisconnect,
 }: ServerHeaderProps) {
   return (
-    <BaseCard
-      icon="solar:server-line-duotone"
-      iconClassName={`text-2xl ${
-        isConnected ? "text-primary" : "text-default-400"
-      }`}
-      iconTestId={`server-icon-${isConnected ? "connected" : "disconnected"}`}
-      title={
-        <div className="flex flex-col gap-2 py-1">
-          <h1 className="text-2xl font-bold tracking-tight">{serverName}</h1>
-          <p className="text-sm text-default-500">
-            Server ID:{" "}
-            <code className="text-primary bg-primary-50/30 px-3 py-1 rounded-md font-mono">
-              {serverId}
-            </code>
-          </p>
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <Icon icon={icon} className="text-xl text-primary" />
+        <div>
+          <h3 className="text-lg ">{serverName}</h3>
+          <p className="text-sm text-default-500">{serverId}</p>
         </div>
-      }
-      headerAction={
-        <div className="flex items-center">
-          <ConnectButton
-            isConnected={isConnected}
-            isConnecting={isConnecting}
-            onConnect={onConnect}
-            onDisconnect={onDisconnect}
-            connectMessage="Connect"
-            disconnectMessage="Disconnect"
-            connectingMessage="..."
+      </div>
+      <div className="flex items-center gap-2">
+        {isConnected ? (
+          <Button
+            color="danger"
+            variant="flat"
             size="sm"
-            className="min-w-[120px]"
-            disabled={isConnecting}
-          />
-        </div>
-      }
-      className="w-full"
-    />
+            onClick={onDisconnect}
+            startContent={<Icon icon="solar:close-circle-bold-duotone" />}
+          >
+            Disconnect
+          </Button>
+        ) : (
+          <Button
+            color="success"
+            variant="flat"
+            size="sm"
+            onClick={onConnect}
+            isLoading={isConnecting}
+            startContent={
+              !isConnecting && <Icon icon="solar:play-circle-bold-duotone" />
+            }
+          >
+            Connect
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }

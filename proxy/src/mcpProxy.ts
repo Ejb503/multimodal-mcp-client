@@ -53,11 +53,15 @@ export class McpProxy {
   private transportHandlers: TransportHandlers;
 
   constructor(config: McpConfig) {
-    // Ensure defaults are properly initialized
-    config.defaults = config.defaults || defaults;
+    // Ensure all required properties are initialized
+    const initializedConfig: McpConfig = {
+      mcpServers: config.mcpServers || {},
+      available: config.available || {},
+      defaults: config.defaults || defaults,
+    };
 
-    this.mcpHandlers = new McpHandlers(config);
-    this.configHandlers = new ConfigHandlers(config);
-    this.transportHandlers = new TransportHandlers(config);
+    this.mcpHandlers = new McpHandlers(initializedConfig);
+    this.configHandlers = new ConfigHandlers(initializedConfig);
+    this.transportHandlers = new TransportHandlers(initializedConfig);
   }
 }

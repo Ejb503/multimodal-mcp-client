@@ -4,21 +4,13 @@ import {
   CreateMessageRequestSchema,
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type {
-  McpClientState,
-  ServerMetadata,
   ServerCapabilities,
-} from "../contexts/McpContext.types";
+  Implementation,
+} from "@modelcontextprotocol/sdk/types.js";
+import type { McpClientState } from "../types/McpContext.types";
+import type { ServerMetadata } from "@/types/server.types";
 import { getServerConfig } from "../../config/server.config";
 import { useMcpData } from "@/contexts/McpDataContext";
-
-interface ServerInfo {
-  name?: unknown;
-  version?: unknown;
-  protocolVersion?: unknown;
-  metadata?: unknown;
-}
 
 export function useMcpConnection(
   updateClientState: (
@@ -32,12 +24,18 @@ export function useMcpConnection(
     serverId: string
   ) => void
 ) {
-  const { mcpData } = useMcpData();
+  const { state } = useMcpData();
 
   const connectServer = async (serverId: string) => {
-    if (!mcpData) {
-      throw new Error("MCP data not available");
+    if (state.status === "loading") {
+      throw new Error("MCP data is still loading");
     }
+
+    if (state.status === "error") {
+      throw new Error(`Failed to load MCP data: ${state.error.message}`);
+    }
+
+    const mcpData = state.mcpData;
 
     // Verify server exists in config
     if (!mcpData.mcpServers[serverId]) {
@@ -167,7 +165,7 @@ export function useMcpConnection(
       // Check connection by attempting to get server info
       try {
         // Get server info and capabilities
-        const serverInfo = client.getServerVersion() as ServerInfo;
+        const serverInfo = client.getServerVersion() as Implementation;
         if (!serverInfo || typeof serverInfo !== "object") {
           throw new Error("Failed to get server info");
         }

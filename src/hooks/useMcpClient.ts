@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import type { McpClientState } from "../contexts/McpContext.types";
+import type { McpClientState } from "../types/McpContext.types";
 import type { ProgressNotification } from "@modelcontextprotocol/sdk/types.js";
 
 export const DEFAULT_CLIENT_STATE: McpClientState = {

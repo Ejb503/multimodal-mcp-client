@@ -36,16 +36,18 @@ describe("ServerCard", () => {
   it("shows connected status with primary color", () => {
     render(<ServerCard {...defaultProps} />);
     const icon = screen.getByTestId("server-icon-connected");
+    const iconContainer = icon.closest("div.p-2");
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveClass("text-primary");
+    expect(iconContainer).toHaveClass("text-primary");
     expect(icon).toHaveAttribute("data-icon", "solar:server-line-duotone");
   });
 
   it("shows disconnected status with default color", () => {
     render(<ServerCard {...defaultProps} isConnected={false} />);
     const icon = screen.getByTestId("server-icon-disconnected");
+    const iconContainer = icon.closest("div.p-2");
     expect(icon).toBeInTheDocument();
-    expect(icon).toHaveClass("text-default-400");
+    expect(iconContainer).toHaveClass("text-default-400");
     expect(icon).toHaveAttribute("data-icon", "solar:server-line-duotone");
   });
 

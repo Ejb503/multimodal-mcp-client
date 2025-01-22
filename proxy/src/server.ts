@@ -236,8 +236,8 @@ export class ProxyServer {
             // Print quick start guide
             console.log(chalk.yellow("Quick Start:"));
             console.log(
-              chalk.gray("• Open your browser to:"),
-              chalk.cyan(`http://localhost:${currentPort}`)
+              chalk.gray("• Client running on port: 5173"),
+              chalk.cyan(`http://localhost:5173`)
             );
             console.log(
               chalk.gray("• Press"),

@@ -94,7 +94,6 @@ describe("ServerPage", () => {
   it("displays server information when connected", () => {
     render(<ServerPage />);
     expect(screen.getByText("Test Server")).toBeInTheDocument();
-    expect(screen.getByText("Server ID:")).toBeInTheDocument();
     expect(screen.getByText("test-server")).toBeInTheDocument();
   });
 
@@ -110,7 +109,9 @@ describe("ServerPage", () => {
       actions: mockServerActions,
     });
     render(<ServerPage />);
-    expect(screen.getByText("...")).toBeInTheDocument();
+    const connectButton = screen.getByRole("button", { name: /connect/i });
+    expect(connectButton).toBeInTheDocument();
+    expect(connectButton).toHaveAttribute("data-loading", "true");
   });
 
   it("shows error state", () => {

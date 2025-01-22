@@ -1,7 +1,8 @@
-import { Chip, Link, Button } from "@nextui-org/react";
+import { Chip, Button } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import { BaseCard } from "./BaseCard";
 import { useState } from "react";
+import { ExternalLink } from "../Link/ExternalLink";
 
 interface AvailableServerCardProps {
   title: string;
@@ -96,13 +97,9 @@ export function AvailableServerCard({
         </div>
 
         <div className="flex gap-2 mt-2">
-          <Link href={githubLink} target="_blank" size="sm" className="text-xs">
-            GitHub
-          </Link>
+          <ExternalLink href={githubLink} type="github" size="sm" />
           <div className="text-default-400">•</div>
-          <Link href={npmLink} target="_blank" size="sm" className="text-xs">
-            NPM
-          </Link>
+          <ExternalLink href={npmLink} type="npm" size="sm" />
         </div>
       </div>
     </BaseCard>

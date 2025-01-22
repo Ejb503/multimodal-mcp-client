@@ -6,65 +6,11 @@ import type {
   Tool,
   CreateMessageRequest,
   CreateMessageResult,
+  ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
-import type { ServerMetadata } from "../../config/types";
 
-export type { ServerMetadata };
 export type ToolCall = z.infer<typeof CallToolResultSchema>;
-
-export interface ExperimentalCapabilities {
-  sampling?: {
-    /**
-     * Whether this server supports sampling requests.
-     */
-    sample?: boolean;
-  };
-  [key: string]: unknown;
-}
-
-export interface ServerCapabilities {
-  /**
-   * Experimental, non-standard capabilities that the server supports.
-   */
-  experimental?: ExperimentalCapabilities;
-  /**
-   * Present if the server supports sending log messages to the client.
-   */
-  logging?: object;
-  /**
-   * Present if the server offers any prompt templates.
-   */
-  prompts?: {
-    /**
-     * Whether this server supports notifications for changes to the prompt list.
-     */
-    listChanged?: boolean;
-  };
-  /**
-   * Present if the server offers any resources to read.
-   */
-  resources?: {
-    /**
-     * Whether this server supports subscribing to resource updates.
-     */
-    subscribe?: boolean;
-    /**
-     * Whether this server supports notifications for changes to the resource list.
-     */
-    listChanged?: boolean;
-  };
-  /**
-   * Present if the server offers any tools to call.
-   */
-  tools?: {
-    /**
-     * Whether this server supports notifications for changes to the tool list.
-     */
-    listChanged?: boolean;
-  };
-  sampling?: object;
-}
 
 export interface McpClientState {
   client: Client | null;
@@ -81,7 +27,7 @@ export interface McpClientState {
     version: string;
     protocolVersion: string;
     capabilities: ServerCapabilities;
-    metadata?: ServerMetadata;
+    metadata?: unknown;
   };
   selectedPrompt?: unknown;
   serverConfig?: {
@@ -92,7 +38,7 @@ export interface McpClientState {
     href?: string;
     description?: string;
     serverId?: string;
-    metadata?: ServerMetadata;
+    metadata?: unknown;
   };
   onProgress?: (status: string) => void;
 }

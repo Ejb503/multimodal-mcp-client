@@ -296,12 +296,10 @@ describe("ToolsSection", () => {
 
     // Wait for the error message in the execution history
     await waitFor(() => {
-      const historyCard = screen.getByTestId("execution-history-card");
-      expect(historyCard).toBeInTheDocument();
+      const logEntry = screen.getByTestId("execution-log-entry");
+      expect(logEntry).toBeInTheDocument();
 
-      const errorSection = within(historyCard).getByTestId(
-        "execution-log-error"
-      );
+      const errorSection = within(logEntry).getByTestId("execution-log-error");
       expect(errorSection).toBeInTheDocument();
       expect(within(errorSection).getByText("Error")).toBeInTheDocument();
       expect(within(errorSection).getByText("Test error")).toBeInTheDocument();
