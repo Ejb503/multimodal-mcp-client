@@ -1,7 +1,5 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs/promises";
-import { input } from "@inquirer/prompts";
-
 import {
   validateEnvironmentVariables,
   loadApiKey,
@@ -72,36 +70,32 @@ describe("preflight", () => {
   });
 
   describe("loadApiKey", () => {
-    it("should return existing API key from env", async () => {
+    it("should return existing API key from env when .env file exists", async () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-key";
+      vi.mocked(fs.readFile).mockResolvedValue("SYSTEMPROMPT_API_KEY=test-key");
+
       const apiKey = await loadApiKey();
       expect(apiKey).toBe("test-key");
     });
 
-    it("should prompt for API key if not in env", async () => {
-      delete process.env.SYSTEMPROMPT_API_KEY;
-      vi.mocked(input).mockResolvedValue("new-test-key");
-      vi.mocked(fs.readFile).mockResolvedValue("");
+    it("should create .env file if it doesn't exist", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-key";
+      vi.mocked(fs.readFile).mockRejectedValue({ code: "ENOENT" });
       vi.mocked(fs.writeFile).mockResolvedValue();
 
       const apiKey = await loadApiKey();
-      expect(apiKey).toBe("new-test-key");
+      expect(apiKey).toBe("test-key");
       expect(fs.writeFile).toHaveBeenCalledWith(
-        ".env",
-        "SYSTEMPROMPT_API_KEY=new-test-key"
+        expect.stringContaining(".env"),
+        "SYSTEMPROMPT_API_KEY=test-key\n"
       );
     });
 
-    it("should update existing API key in env file", async () => {
+    it("should throw error when API key is not in environment", async () => {
       delete process.env.SYSTEMPROMPT_API_KEY;
-      vi.mocked(input).mockResolvedValue("new-test-key");
-      vi.mocked(fs.readFile).mockResolvedValue("SYSTEMPROMPT_API_KEY=old-key");
-      vi.mocked(fs.writeFile).mockResolvedValue();
 
-      await loadApiKey();
-      expect(fs.writeFile).toHaveBeenCalledWith(
-        ".env",
-        "SYSTEMPROMPT_API_KEY=new-test-key"
+      await expect(loadApiKey()).rejects.toThrow(
+        "SYSTEMPROMPT_API_KEY is not set"
       );
     });
   });
@@ -119,26 +113,35 @@ describe("preflight", () => {
       ]);
 
       // Mock backend response
-      const mockBackendServers = {
-        "systemprompt-mcp-notion": {
-          env: ["NOTION_API_KEY"],
-          metadata: {
-            icon: "notion-icon",
-            description: "Notion integration",
+      const mockBackendResponse = {
+        data: {
+          mcpServers: {
+            "systemprompt-mcp-notion": {
+              command: "node",
+              args: ["extensions/systemprompt-mcp-notion/build/index.js"],
+              env: ["NOTION_API_KEY"],
+              metadata: {
+                icon: "notion-icon",
+                description: "Notion integration",
+              },
+            },
           },
-        },
-        "systemprompt-mcp-core": {
-          env: ["SYSTEMPROMPT_API_KEY"],
-          metadata: {
-            icon: "core-icon",
-            description: "Core functionality",
+          available: {
+            "systemprompt-mcp-notion": {
+              id: "notion",
+              type: "core",
+              title: "Notion",
+              description: "Notion integration",
+              environment_variables: ["NOTION_API_KEY"],
+              icon: "notion-icon",
+            },
           },
         },
       };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ mcpServers: mockBackendServers }),
+        json: () => Promise.resolve(mockBackendResponse),
       });
 
       // Mock custom config
@@ -152,63 +155,136 @@ describe("preflight", () => {
         },
       };
 
-      vi.mocked(fs.readFile).mockResolvedValue(
-        JSON.stringify(mockCustomConfig)
-      );
+      // Mock config files
+      const mockFileReads = new Map([
+        ["mcp.config.custom.json", JSON.stringify(mockCustomConfig)],
+        ["mcp.config.json", JSON.stringify({ mcpServers: {} })],
+      ]);
+
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        const pathStr = path.toString();
+        for (const [pattern, content] of mockFileReads.entries()) {
+          if (pathStr.endsWith(pattern)) {
+            return Promise.resolve(content);
+          }
+        }
+        return Promise.reject(new Error(`No mock for path: ${path}`));
+      });
 
       const result = await loadServerConfig();
 
       expect(result.mcpServers).toBeDefined();
+      expect(Object.keys(result.mcpServers)).toContain("custom-server");
       expect(Object.keys(result.mcpServers)).toContain(
         "systemprompt-mcp-notion"
       );
-      expect(Object.keys(result.mcpServers)).toContain("systemprompt-mcp-core");
-      expect(Object.keys(result.mcpServers)).toContain("custom-server");
     });
 
     it("should warn about missing extensions", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+
       // Mock only one available extension
       vi.mocked(fs.readdir).mockResolvedValue([
         createMockDirent("systemprompt-mcp-notion"),
       ]);
 
-      // Mock backend response with servers that need missing extensions
-      const mockBackendServers = {
-        "systemprompt-mcp-notion": {
-          env: ["NOTION_API_KEY"],
-        },
-        "systemprompt-mcp-missing": {
-          env: ["OTHER_KEY"],
+      // Mock backend response
+      const mockBackendResponse = {
+        data: {
+          mcpServers: {
+            "systemprompt-mcp-notion": {
+              command: "node",
+              args: ["extensions/systemprompt-mcp-notion/build/index.js"],
+              env: ["NOTION_API_KEY"],
+            },
+            "systemprompt-mcp-missing": {
+              command: "node",
+              args: ["extensions/systemprompt-mcp-missing/build/index.js"],
+              env: ["OTHER_KEY"],
+            },
+          },
+          available: {
+            "systemprompt-mcp-notion": {
+              id: "notion",
+              type: "core",
+              title: "Notion",
+              environment_variables: ["NOTION_API_KEY"],
+            },
+            "systemprompt-mcp-missing": {
+              id: "missing",
+              type: "core",
+              title: "Missing",
+              environment_variables: ["OTHER_KEY"],
+            },
+          },
         },
       };
 
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ mcpServers: mockBackendServers }),
+        json: () => Promise.resolve(mockBackendResponse),
       });
 
-      vi.mocked(fs.readFile).mockResolvedValue("{}");
+      // Mock config files
+      const mockFileReads = new Map([
+        ["mcp.config.custom.json", "{}"],
+        ["mcp.config.json", JSON.stringify({ mcpServers: {} })],
+      ]);
+
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        const pathStr = path.toString();
+        for (const [pattern, content] of mockFileReads.entries()) {
+          if (pathStr.endsWith(pattern)) {
+            return Promise.resolve(content);
+          }
+        }
+        return Promise.reject(new Error(`No mock for path: ${path}`));
+      });
 
       const result = await loadServerConfig();
-
       expect(result.mcpServers["systemprompt-mcp-notion"]).toBeDefined();
       expect(result.mcpServers["systemprompt-mcp-missing"]).toBeUndefined();
     });
 
     it("should handle backend API errors gracefully", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+
       vi.mocked(fs.readdir).mockResolvedValue([
         createMockDirent("systemprompt-mcp-notion"),
       ]);
 
-      // Mock backend API error
-      global.fetch = vi.fn().mockRejectedValue(new Error("API Error"));
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network error"));
 
-      vi.mocked(fs.readFile).mockResolvedValue("{}");
+      const mockCustomConfig = {
+        mcpServers: {
+          "custom-server": {
+            command: "custom-cmd",
+            args: ["--custom"],
+            env: ["CUSTOM_KEY"],
+          },
+        },
+      };
+
+      // Mock config files
+      const mockFileReads = new Map([
+        ["mcp.config.custom.json", JSON.stringify(mockCustomConfig)],
+        ["mcp.config.json", JSON.stringify({ mcpServers: {} })],
+      ]);
+
+      vi.mocked(fs.readFile).mockImplementation((path) => {
+        const pathStr = path.toString();
+        for (const [pattern, content] of mockFileReads.entries()) {
+          if (pathStr.endsWith(pattern)) {
+            return Promise.resolve(content);
+          }
+        }
+        return Promise.reject(new Error(`No mock for path: ${path}`));
+      });
 
       const result = await loadServerConfig();
 
-      // Should still load custom config even if backend fails
       expect(result.mcpServers).toBeDefined();
+      expect(Object.keys(result.mcpServers)).toContain("custom-server");
     });
   });
 

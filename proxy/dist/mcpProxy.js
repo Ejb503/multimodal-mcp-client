@@ -30,10 +30,14 @@ export default function mcpProxy({ transportToClient, transportToServer, onerror
 }
 export class McpProxy {
     constructor(config) {
-        // Ensure defaults are properly initialized
-        config.defaults = config.defaults || defaults;
-        this.mcpHandlers = new McpHandlers(config);
-        this.configHandlers = new ConfigHandlers(config);
-        this.transportHandlers = new TransportHandlers(config);
+        // Ensure all required properties are initialized
+        const initializedConfig = {
+            mcpServers: config.mcpServers || {},
+            available: config.available || {},
+            defaults: config.defaults || defaults,
+        };
+        this.mcpHandlers = new McpHandlers(initializedConfig);
+        this.configHandlers = new ConfigHandlers(initializedConfig);
+        this.transportHandlers = new TransportHandlers(initializedConfig);
     }
 }

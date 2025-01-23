@@ -1,11 +1,13 @@
 import type { Request, Response } from "express";
-import type { McpConfig } from "../types/index.js";
 import axios from "axios";
-import path from "path";
-import type { McpServiceResponse } from "../types/index.js";
+import type {
+  McpServiceResponse,
+  McpConfig,
+  McpAgent,
+} from "../types/index.js";
 
 // LLMS: DO NOT CHANGE
-const MCP_SERVER_URL = "https://api.systemprompt.io";
+export const MCP_SERVER_URL = "https://api.systemprompt.io";
 const TIMEOUT_MS = 5000;
 
 export class McpHandlers {
@@ -18,33 +20,37 @@ export class McpHandlers {
       throw new Error("MCP Service response missing available modules");
     }
 
-    // Map available modules to mcpServers format for executable servers
+    // Create a Set of installed module IDs for faster lookup
+    const installedModules = new Set(
+      response.installed.map((module) => module.name)
+    );
+
     const mcpServers = Object.entries(response.available).reduce(
       (acc, [name, moduleInfo]) => {
-        if (name.startsWith("systemprompt-mcp-")) {
-          // For backend servers, set command to node and args to the server path
-          const serverPath = path.join(
-            process.cwd(),
-            "extensions",
-            name,
-            "build",
-            "index.js"
+        if (installedModules.has(name)) {
+          // Get the platform-specific command
+          const command = process.platform === "win32" ? "npx.cmd" : "npx";
+
+          // Create environment record
+          const envRecord = (moduleInfo.environment_variables || []).reduce(
+            (env, key) => ({
+              ...env,
+              [key]: process.env[key] || "",
+            }),
+            {}
           );
 
           acc[name] = {
-            id: moduleInfo.id,
-            type: moduleInfo.type,
-            title: moduleInfo.title,
-            description: moduleInfo.description,
-            environment: moduleInfo.environment_variables,
-            command: "node",
-            args: [serverPath],
+            command,
+            args: [name], // Use the package name directly with npx
+            env: envRecord,
             metadata: {
-              created: moduleInfo.metadata.created,
-              updated: moduleInfo.metadata.updated,
-              version: moduleInfo.metadata.version,
-              status: moduleInfo.metadata.status,
+              icon: moduleInfo.icon,
+              description: moduleInfo.description,
+              title: moduleInfo.title,
+              type: moduleInfo.type,
             },
+            agent: moduleInfo.agent,
           };
         }
         return acc;
@@ -52,14 +58,29 @@ export class McpHandlers {
       {} as McpConfig["mcpServers"]
     );
 
-    // Return config with API-provided available modules and merged servers
+    console.log("Merging Servers", mcpServers);
+
+    this.config.mcpServers = {
+      ...this.config.mcpServers,
+      ...mcpServers,
+    };
+    this.config.available = response.available;
+
+    const allAgents: McpAgent[] = Object.values(response.available).reduce(
+      (agents, moduleInfo) => {
+        if (moduleInfo.agent && moduleInfo.agent.length > 0) {
+          return [...agents, ...moduleInfo.agent];
+        }
+        return agents;
+      },
+      [] as McpAgent[]
+    );
+
     return {
       ...this.config,
-      mcpServers: {
-        ...this.config.mcpServers, // Keep custom servers
-        ...mcpServers, // Add executable MCP servers
-      },
-      available: response.available, // Always use API-provided modules
+      mcpServers: this.config.mcpServers,
+      available: response.available,
+      agents: allAgents,
     };
   }
 
@@ -70,10 +91,10 @@ export class McpHandlers {
   public async handleGetMcp(req: Request, res: Response): Promise<void> {
     try {
       const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+
       if (!apiKey) {
         throw new Error("API key not configured");
       }
-
       const response = await axios.get<McpServiceResponse>(
         `${MCP_SERVER_URL}/v1/mcp`,
         {
@@ -85,25 +106,15 @@ export class McpHandlers {
         }
       );
 
-      // Validate response data
       if (!response.data) {
         throw new Error("Invalid response from MCP service");
       }
 
-      // Map the service response to our config format
       const mergedConfig = this.mapServiceResponseToConfig(response.data);
-
-      // Log the merged config for debugging
-      console.debug("MCP config:", {
-        mcpServersCount: Object.keys(mergedConfig.mcpServers).length,
-        availableModulesCount: Object.keys(mergedConfig.available).length,
-      });
 
       res.status(200).json(mergedConfig);
     } catch (error) {
       console.error("Error in GET /v1/mcp:", error);
-
-      // Always throw API errors since we need the available modules
       throw error;
     }
   }
@@ -172,10 +183,6 @@ export class McpHandlers {
         ...this.config.mcpServers,
         ...req.body.mcpServers,
       };
-      this.config.customServers = {
-        ...(this.config.customServers || {}),
-        ...(req.body.customServers || {}),
-      };
 
       // If remote server returns unauthorized, acknowledge local update
       if (response.status === 401) {
@@ -183,7 +190,6 @@ export class McpHandlers {
           status: "Configuration updated locally",
           _warning: "Remote update failed - unauthorized",
           mcpServers: this.config.mcpServers,
-          customServers: this.config.customServers || {},
         });
         return;
       }
@@ -208,8 +214,61 @@ export class McpHandlers {
           ...this.config.mcpServers,
           ...req.body.mcpServers,
         },
-        customServers: req.body.customServers || {},
       });
+    }
+  }
+
+  /**
+   * Handles POST /v1/mcp/install requests
+   * Installs a new MCP server
+   */
+  public async handleInstallMcp(req: Request, res: Response): Promise<void> {
+    try {
+      const { serverId } = req.body;
+      if (!serverId) {
+        throw new Error("Server ID is required");
+      }
+
+      // Get the server info from available servers
+      const serverInfo = this.config.available[serverId];
+      if (!serverInfo) {
+        throw new Error(`Server ${serverId} not found in available servers`);
+      }
+
+      // Create the server configuration with npx command
+      const command = process.platform === "win32" ? "npx.cmd" : "npx";
+      const serverConfig = {
+        command,
+        args: ["-y", serverId],
+        env: {
+          SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "",
+        },
+        metadata: {
+          icon: serverInfo.icon,
+          description: serverInfo.description,
+          title: serverInfo.title,
+          type: serverInfo.type,
+        },
+      };
+
+      // Update the configuration
+      this.config.mcpServers = {
+        ...this.config.mcpServers,
+        [serverId]: serverConfig,
+      };
+
+      // Return the updated configuration
+      res.status(200).json({
+        status: "Server installed successfully",
+        mcpServers: this.config.mcpServers,
+      });
+    } catch (error) {
+      console.error("Error in POST /v1/mcp/install:", error);
+      if (error instanceof Error) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
     }
   }
 }

@@ -64,6 +64,7 @@ export function useLiveAPI({
 
   const handleToolCall = useCallback(
     async (toolCall: ToolCall) => {
+      console.log(toolCall);
       const currentClient = clientRef.current;
       if (!currentClient) {
         console.error("Cannot execute tool call - no client");

@@ -177,10 +177,11 @@ describe("useSidebarItems", () => {
   it("should render all sidebar sections", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
-    expect(result.current.sections).toHaveLength(4);
+    expect(result.current.sections).toHaveLength(5);
     expect(result.current.sections.map((s) => s.title)).toEqual([
       "Main",
       "Core Servers",
+      "Logs",
       "Settings",
       "Help",
     ]);

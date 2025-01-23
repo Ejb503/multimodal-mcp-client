@@ -145,6 +145,7 @@ export default function ControlPage() {
                 {availableServers.map(([key, server]) => (
                   <AvailableServerCard
                     key={key}
+                    serverId={key}
                     title={server.title}
                     description={server.description}
                     icon={server.icon}

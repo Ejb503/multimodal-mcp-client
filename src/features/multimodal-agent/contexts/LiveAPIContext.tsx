@@ -54,6 +54,7 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
     toolName: string,
     args: Record<string, unknown>
   ) => {
+    console.log(toolName, args);
     const maxRetries = 3;
     let lastError: Error | null = null;
 
@@ -74,7 +75,8 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
           continue;
         }
 
-        // Check if the tool is available in any MCP client
+        console.log(availableTools);
+        console.log(toolName);
         const mcpTool = availableTools.find((tool) => tool.name === toolName);
         if (!mcpTool) {
           throw new Error(

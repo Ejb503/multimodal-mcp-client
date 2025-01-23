@@ -1,6 +1,7 @@
 import type { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import type { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { ServerDefaults } from "./server.types.js";
+import { SystempromptAgent } from "./systemprompt.js";
 
 export type TransportType = "stdio" | "sse";
 export type Transport = StdioClientTransport | SSEClientTransport;
@@ -23,7 +24,7 @@ export interface BackendServerConfig {
 
 export interface ServerConfig {
   command: string;
-  args?: string[];
+  args: string[];
   env?: Record<string, string>;
   metadata?: Record<string, unknown>;
   agent?: unknown[];
@@ -51,6 +52,7 @@ export interface McpConfig {
   mcpServers: Record<string, ServerConfig>;
   available: Record<string, McpModuleInfo>;
   defaults?: ServerDefaults;
+  agents: SystempromptAgent[];
 }
 
 export interface JsonRpcMessage {

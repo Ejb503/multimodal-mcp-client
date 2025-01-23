@@ -54,7 +54,7 @@ export class TransportHandlers {
   ): Promise<StdioClientTransport> {
     const serverConfig = this.config.mcpServers[serverId];
     if (!serverConfig) {
-      throw new Error(`No configuration found for server: ${serverId}`);
+      throw new Error(`No configuration found for server2: ${serverId}`);
     }
 
     console.log(`Setting up stdio transport for server ${serverId}`);

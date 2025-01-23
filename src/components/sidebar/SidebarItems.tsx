@@ -107,6 +107,21 @@ export function useSidebarItems() {
   if (coreServers.length > 0) {
     sections.push({ title: "Core Servers", items: coreServers });
   }
+
+  sections.push({
+    title: "Logs",
+    items: [
+      {
+        key: "settings",
+        label: "Settings",
+        icon: "solar:settings-line-duotone",
+        description: "View logs",
+        href: "/logs",
+        color: "primary",
+      },
+    ],
+  });
+
   sections.push({
     title: "Settings",
     items: [

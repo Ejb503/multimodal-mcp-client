@@ -16,16 +16,14 @@ export interface TransportParams {
  * Maps array-style environment variables to their actual values
  * @param envConfig The environment configuration object
  * @param baseEnv Base environment to extend from (optional)
- * @returns Mapped environment variables
+ * @returns Mapped environment variables with API[name] and API key
  */
 export function mapEnvironmentVariables(
   envConfig: Record<string, unknown> | string[] = {},
   baseEnv: Record<string, string> = process.env as Record<string, string>
 ): Record<string, string> {
-  // Start with a fresh environment
-  const env: Record<string, string> = {};
+  const env: Record<string, string> = { ...baseEnv };
 
-  // Handle array-style environment variables
   if (Array.isArray(envConfig)) {
     envConfig.forEach((key) => {
       if (typeof key === "string" && baseEnv[key]) {
@@ -34,14 +32,10 @@ export function mapEnvironmentVariables(
     });
     return env;
   }
-
-  // Handle object-style environment variables
   Object.entries(envConfig).forEach(([key, value]) => {
     if (!isNaN(Number(key)) && typeof value === "string" && baseEnv[value]) {
-      // For array-style env vars, use the env var name as the key
       env[value] = baseEnv[value];
     } else if (typeof value === "string") {
-      // For direct key-value pairs
       env[key] = value;
     }
   });
@@ -52,6 +46,7 @@ export function mapEnvironmentVariables(
 export class TransportManager {
   private webAppTransports: SSEServerTransport[] = [];
   private config: McpConfig;
+  private activeTransports: Map<string, Transport> = new Map();
 
   constructor(config: McpConfig) {
     this.config = config;
@@ -83,45 +78,33 @@ export class TransportManager {
     const { transportType, serverId } = this.validateTransportParams(query);
     console.log(`Creating ${transportType} transport for server ${serverId}`);
 
+    let transport: Transport;
     if (transportType === "stdio") {
-      return this.createStdioTransport(serverId);
+      transport = await this.createStdioTransport(serverId);
+    } else {
+      transport = await this.createSSETransport(serverId);
     }
 
-    return this.createSSETransport(serverId);
+    // Store the transport in the activeTransports map
+    this.activeTransports.set(serverId, transport);
+    return transport;
   }
 
   private async createStdioTransport(
     serverId: string
   ): Promise<StdioClientTransport> {
+    console.log(this.config.mcpServers);
     const serverConfig = this.config.mcpServers[serverId];
     if (!serverConfig) {
-      throw new Error(`No configuration found for server: ${serverId}`);
+      throw new Error(`No configuration found for server1: ${serverId}`);
     }
 
     if (!serverConfig.command || serverConfig.command.trim() === "") {
       throw new Error("Server command is required for stdio transport");
     }
 
-    console.log(`Setting up stdio transport for server ${serverId}`);
-    console.log("Server config:", JSON.stringify(serverConfig, null, 2));
-    console.log("Full server config:", {
-      command: serverConfig.command,
-      args: serverConfig.args,
-      env: serverConfig.env,
-    });
-
     // Map environment variables
     const env = mapEnvironmentVariables(serverConfig.env);
-    console.log("Mapped environment:", env);
-
-    // Debug log the mapped environment
-    const mappedEnvOnly = Object.fromEntries(
-      Object.entries(env).filter(
-        ([key]) =>
-          serverConfig.env && Object.values(serverConfig.env).includes(key)
-      )
-    );
-    console.log("Server environment:", mappedEnvOnly);
 
     const transport = new StdioClientTransport({
       command: serverConfig.command,
@@ -129,17 +112,9 @@ export class TransportManager {
       env,
       stderr: "pipe",
     });
-    console.log("Transport config:", {
-      command: serverConfig.command,
-      args: serverConfig.args || [],
-      env: Object.keys(env),
-    });
 
     try {
       await transport.start();
-      console.log(
-        `Stdio transport started successfully for server ${serverId}`
-      );
       return transport;
     } catch (error) {
       console.error(
@@ -153,14 +128,17 @@ export class TransportManager {
   private async createSSETransport(
     serverId: string
   ): Promise<SSEClientTransport> {
-    if (!this.config.sse?.systemprompt) {
-      throw new Error(`SSE configuration is not available`);
+    const serverConfig = this.config.mcpServers[serverId];
+    if (!serverConfig) {
+      throw new Error(`No configuration found for server: ${serverId}`);
     }
 
-    console.log(`Setting up SSE transport for server ${serverId}`);
-    const serverConfig = this.config.sse.systemprompt;
-    const url = new URL(serverConfig.url);
-    url.searchParams.set("apiKey", serverConfig.apiKey);
+    if (!process.env.SYSTEMPROMPT_API_KEY) {
+      throw new Error("API key not configured");
+    }
+
+    const url = new URL("https://api.systemprompt.io/v1/mcp/sse");
+    url.searchParams.set("apiKey", process.env.SYSTEMPROMPT_API_KEY);
 
     const transport = new SSEClientTransport(url);
     try {
@@ -256,5 +234,47 @@ export class TransportManager {
     );
     this.webAppTransports = [];
     console.log("Transport cleanup complete");
+  }
+
+  public async refreshTransports(newConfig: McpConfig): Promise<void> {
+    console.log("Refreshing transports with new configuration");
+
+    // Store old config for comparison
+    const oldConfig = this.config;
+
+    // Update the configuration
+    this.config = newConfig;
+
+    // Get set of new server IDs
+    const newServerIds = new Set(Object.keys(newConfig.mcpServers));
+
+    // Close and remove transports for servers that no longer exist
+    for (const [serverId, transport] of this.activeTransports.entries()) {
+      if (!newServerIds.has(serverId)) {
+        console.log(`Closing transport for removed server: ${serverId}`);
+        await transport.close?.();
+        this.activeTransports.delete(serverId);
+      }
+    }
+
+    // For servers with changed configurations, close and recreate their transports
+    for (const serverId of newServerIds) {
+      const oldServer = oldConfig.mcpServers[serverId];
+      const newServer = newConfig.mcpServers[serverId];
+
+      if (
+        oldServer &&
+        JSON.stringify(oldServer) !== JSON.stringify(newServer)
+      ) {
+        console.log(`Updating transport for modified server: ${serverId}`);
+        const existingTransport = this.activeTransports.get(serverId);
+        if (existingTransport) {
+          await existingTransport.close?.();
+          this.activeTransports.delete(serverId);
+        }
+      }
+    }
+
+    console.log("Transport refresh complete");
   }
 }

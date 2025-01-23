@@ -1,6 +1,5 @@
 import { SidebarItem } from "@/components/sidebar/types";
-import { ServerMetadata, McpConfig, StdioServerConfig } from "./types";
-import { McpData } from "@/contexts/McpDataContext";
+import { McpData, ServerMetadata } from "@/types/server.types";
 
 /**
  * Gets the configuration for a single server
@@ -15,7 +14,7 @@ export function getServerConfig(
 
   const serverConfig = mcpData.mcpServers[id];
   if (!serverConfig)
-    throw new Error(`No configuration found for server: ${id}`);
+    throw new Error(`No configuration found for server4: ${id}`);
 
   const metadata = {
     ...serverConfig.metadata,
@@ -32,7 +31,12 @@ export function getServerConfig(
     key: `server-${id}`,
     label: name,
     icon: metadata.icon,
-    color: metadata.color,
+    color: metadata.color as
+      | "secondary"
+      | "success"
+      | "warning"
+      | "primary"
+      | undefined,
     href: `/servers/${id}`,
     description: metadata.description || name,
     serverId: id,
@@ -59,28 +63,6 @@ export function getServerNames(mcpData: McpData): Record<string, string> {
     names[id] = getServerConfig(id, mcpData).label;
     return names;
   }, {} as Record<string, string>);
-}
-
-export function getServerType(config: StdioServerConfig): "stdio" | "sse" {
-  return "args" in config ? "stdio" : "sse";
-}
-
-export function getRawServerConfig(
-  id: string,
-  mcpData: McpConfig
-): StdioServerConfig {
-  const serverConfig = mcpData.mcpServers[id];
-  if (!serverConfig) {
-    throw new Error(`No configuration found for server: ${id}`);
-  }
-  return serverConfig;
-}
-
-export function buildServerMetadata(config: StdioServerConfig): ServerMetadata {
-  return {
-    ...config.metadata,
-    color: config.metadata?.color || "secondary",
-  };
 }
 
 export function formatServerLabel(

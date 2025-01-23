@@ -165,7 +165,7 @@ export class ProxyServer {
                         console.log(chalk.gray("Your AI assistant is ready to help.\n"));
                         // Print quick start guide
                         console.log(chalk.yellow("Quick Start:"));
-                        console.log(chalk.gray("• Open your browser to:"), chalk.cyan(`http://localhost:${currentPort}`));
+                        console.log(chalk.gray("• Client running on port: 5173"), chalk.cyan(`http://localhost:5173`));
                         console.log(chalk.gray("• Press"), chalk.cyan("Ctrl+C"), chalk.gray("to stop the server"));
                         console.log(chalk.gray("• View logs below for real-time updates\n"));
                         console.log(chalk.dim("─".repeat(boxWidth)));

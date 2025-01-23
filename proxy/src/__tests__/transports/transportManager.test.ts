@@ -37,6 +37,26 @@ describe("TransportManager", () => {
         },
       },
     },
+    available: {},
+    defaults: {
+      serverTypes: {
+        stdio: {
+          icon: "test-icon",
+          color: "primary",
+          description: "Test stdio server",
+        },
+        sse: {
+          icon: "test-icon",
+          color: "primary",
+          description: "Test SSE server",
+        },
+      },
+      unconnected: {
+        icon: "test-icon",
+        color: "secondary",
+        description: "Test unconnected server",
+      },
+    },
   };
 
   beforeEach(() => {
@@ -101,6 +121,7 @@ describe("TransportManager", () => {
     });
 
     it("should create sse transport", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-key";
       const mockConfig: McpConfig = {
         mcpServers: {
           default: {
@@ -108,10 +129,24 @@ describe("TransportManager", () => {
             args: ["--test"],
           },
         },
-        sse: {
-          systemprompt: {
-            url: "https://test.com",
-            apiKey: "test-key",
+        available: {},
+        defaults: {
+          serverTypes: {
+            stdio: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test stdio server",
+            },
+            sse: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test SSE server",
+            },
+          },
+          unconnected: {
+            icon: "test-icon",
+            color: "secondary",
+            description: "Test unconnected server",
           },
         },
       };
@@ -123,16 +158,23 @@ describe("TransportManager", () => {
       });
 
       expect(transport).toBe(mockSseTransport);
-      expect(SSEClientTransport).toHaveBeenCalledWith(expect.any(URL));
+      expect(SSEClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostname: "api.systemprompt.io",
+          pathname: "/v1/mcp/sse",
+          searchParams: expect.any(URLSearchParams),
+        })
+      );
     });
 
-    it("should throw error for missing SSE config", async () => {
+    it("should throw error for missing API key", async () => {
+      delete process.env.SYSTEMPROMPT_API_KEY;
       await expect(
         manager.createTransport({
           transportType: "sse" as TransportType,
           serverId: "default",
         })
-      ).rejects.toThrow("SSE configuration is not available");
+      ).rejects.toThrow("API key not configured");
     });
 
     it("should throw error for missing server config", async () => {
@@ -148,17 +190,53 @@ describe("TransportManager", () => {
       const originalEnv = process.env;
       process.env = { ...originalEnv, SYSTEMPROMPT_API_KEY: "test-key" };
 
+      const mockConfig: McpConfig = {
+        mcpServers: {
+          "test-server": {
+            command: "test-command",
+            args: ["--test"],
+            env: {
+              TEST_ENV: "test-value",
+            },
+          },
+        },
+        available: {},
+        defaults: {
+          serverTypes: {
+            stdio: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test stdio server",
+            },
+            sse: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test SSE server",
+            },
+          },
+          unconnected: {
+            icon: "test-icon",
+            color: "secondary",
+            description: "Test unconnected server",
+          },
+        },
+      };
+
+      const manager = new TransportManager(mockConfig);
+
       const transport = await manager.createTransport({
         transportType: "stdio" as TransportType,
-        serverId: "default",
+        serverId: "test-server",
       });
 
       expect(transport).toBe(mockStdioTransport);
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          env: expect.objectContaining({
-            SYSTEMPROMPT_API_KEY: "test-key",
-          }),
+          command: "test-command",
+          args: ["--test"],
+          env: {
+            TEST_ENV: "test-value",
+          },
         })
       );
 
@@ -178,6 +256,7 @@ describe("TransportManager", () => {
     });
 
     it("should handle SSE transport start failure", async () => {
+      process.env.SYSTEMPROMPT_API_KEY = "test-key";
       const mockConfig: McpConfig = {
         mcpServers: {
           default: {
@@ -185,13 +264,28 @@ describe("TransportManager", () => {
             args: ["--test"],
           },
         },
-        sse: {
-          systemprompt: {
-            url: "https://test.com",
-            apiKey: "test-key",
+        available: {},
+        defaults: {
+          serverTypes: {
+            stdio: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test stdio server",
+            },
+            sse: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test SSE server",
+            },
+          },
+          unconnected: {
+            icon: "test-icon",
+            color: "secondary",
+            description: "Test unconnected server",
           },
         },
       };
+
       const manager = new TransportManager(mockConfig);
 
       const mockError = new Error("Failed to start SSE transport");
@@ -206,12 +300,32 @@ describe("TransportManager", () => {
     });
 
     it("should throw error when server command is missing", async () => {
-      const config = {
+      const config: McpConfig = {
         mcpServers: {
           "test-server": {
             command: undefined as unknown as string,
             args: ["--test"],
             env: { TEST_ENV: "test-value" },
+          },
+        },
+        available: {},
+        defaults: {
+          serverTypes: {
+            stdio: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test stdio server",
+            },
+            sse: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test SSE server",
+            },
+          },
+          unconnected: {
+            icon: "test-icon",
+            color: "secondary",
+            description: "Test unconnected server",
           },
         },
       };
@@ -226,12 +340,32 @@ describe("TransportManager", () => {
     });
 
     it("should throw error when server command is empty", async () => {
-      const config = {
+      const config: McpConfig = {
         mcpServers: {
           "test-server": {
             command: "",
             args: ["--test"],
             env: { TEST_ENV: "test-value" },
+          },
+        },
+        available: {},
+        defaults: {
+          serverTypes: {
+            stdio: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test stdio server",
+            },
+            sse: {
+              icon: "test-icon",
+              color: "primary",
+              description: "Test SSE server",
+            },
+          },
+          unconnected: {
+            icon: "test-icon",
+            color: "secondary",
+            description: "Test unconnected server",
           },
         },
       };

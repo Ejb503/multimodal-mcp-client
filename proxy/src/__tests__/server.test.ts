@@ -40,6 +40,8 @@ const mockConfig: McpConfig = {
       args: ["test"],
     },
   },
+  available: {},
+  agents: [],
 };
 
 // Create mock instances with the minimum required methods
@@ -111,13 +113,31 @@ describe("ProxyServer", () => {
     process.env = { ...originalEnv };
     process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
 
-    const config: Partial<McpConfig> = {
+    const config: McpConfig = {
       mcpServers: {
         default: {
           command: "echo",
           args: ["test"],
         },
       },
+      defaults: {
+        serverTypes: {
+          stdio: {
+            name: "stdio",
+            description: "Standard input/output transport",
+          },
+          sse: {
+            name: "sse",
+            description: "Server-sent events transport",
+          },
+        },
+        unconnected: {
+          name: "Not connected",
+          description: "No connection established",
+        },
+      },
+      available: {},
+      agents: [],
     };
     server = createTestServer(config);
     client = createTestClient(server.app);
@@ -160,11 +180,13 @@ describe("ProxyServer", () => {
 
   describe("MCP endpoints", () => {
     it("GET /v1/mcp should return MCP configuration", async () => {
-      const networkError = new Error("Network error") as Error & {
-        code: string;
+      const mockResponse = {
+        data: {
+          installed: [],
+          available: {},
+        },
       };
-      networkError.code = "ECONNREFUSED";
-      vi.mocked(mockedAxios.get).mockRejectedValueOnce(networkError);
+      vi.mocked(mockedAxios.get).mockResolvedValueOnce(mockResponse);
 
       const response = await client.get("/v1/mcp");
       expect(response.status).toBe(200);
@@ -174,9 +196,15 @@ describe("ProxyServer", () => {
     });
 
     it("GET /v1/user/mcp should return user MCP configuration", async () => {
-      vi.mocked(mockedAxios.get).mockRejectedValueOnce(
-        new Error("Network error")
-      );
+      const mockResponse = {
+        data: {
+          user: {
+            name: "Default User",
+            email: "test@example.com",
+          },
+        },
+      };
+      vi.mocked(mockedAxios.get).mockResolvedValueOnce(mockResponse);
 
       const response = await client.get("/v1/user/mcp");
       expect(response.status).toBe(200);

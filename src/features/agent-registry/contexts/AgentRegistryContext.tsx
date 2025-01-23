@@ -92,7 +92,7 @@ export function AgentRegistryProvider({ children }: Props) {
       return acc;
     }, []);
     setTools(allTools);
-    setActiveTools(allTools); // Set all tools as active by default
+    setActiveTools(allTools);
     setConfig((prevConfig) => {
       const parsedTools = mapToolsToGeminiFormat(allTools);
       return {
@@ -100,6 +100,7 @@ export function AgentRegistryProvider({ children }: Props) {
         tools: [
           {
             googleSearch: {},
+            codeExecution: {},
             functionDeclarations: parsedTools,
           },
         ],

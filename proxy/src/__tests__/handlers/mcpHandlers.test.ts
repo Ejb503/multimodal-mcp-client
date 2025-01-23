@@ -10,7 +10,7 @@ import {
 import { McpHandlers } from "../../handlers/mcpHandlers.js";
 import type { Request, Response } from "express";
 import type { McpConfig } from "../../types/index.js";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 vi.mock("axios");
 const mockedAxios = axios as Mocked<typeof axios>;
@@ -43,6 +43,8 @@ describe("McpHandlers", () => {
         description: "Test unconnected server",
       },
     },
+    available: {},
+    agents: [],
   };
 
   const originalEnv = process.env;
@@ -68,14 +70,30 @@ describe("McpHandlers", () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
       const mockResponse = {
         data: {
-          mcpServers: {
-            remote: {
-              command: "remote-command",
-              args: ["--remote"],
+          installed: [],
+          available: {
+            "systemprompt-mcp-test": {
+              id: "test-id",
+              type: "core",
+              title: "Test Module",
+              description: "Test Description",
+              environment_variables: ["TEST_VAR"],
+              github_link: "https://github.com/test",
+              icon: "test-icon",
+              npm_link: "https://npm.test",
+              metadata: {
+                created: "2024-01-01",
+                updated: "2024-01-01",
+                version: 1,
+                status: "active",
+              },
+              block: null,
+              prompt: null,
+              agent: [],
+              _link: "test-link",
             },
           },
         },
-        status: 200,
       };
       mockedAxios.get.mockResolvedValueOnce(mockResponse);
 
@@ -87,15 +105,29 @@ describe("McpHandlers", () => {
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         mcpServers: {
-          remote: {
-            command: "remote-command",
-            args: ["--remote"],
+          "systemprompt-mcp-test": {
+            command: "node",
+            args: [
+              expect.stringContaining(
+                "extensions/systemprompt-mcp-test/build/index.js"
+              ),
+            ],
+            env: { TEST_VAR: "" },
+            metadata: {
+              icon: "test-icon",
+              description: "Test Description",
+              title: "Test Module",
+              type: "core",
+            },
+            agent: [],
           },
           default: {
             command: "test-command",
             args: ["--test"],
           },
         },
+        defaults: mockConfig.defaults,
+        available: mockResponse.data.available,
       });
     });
 
@@ -115,7 +147,9 @@ describe("McpHandlers", () => {
 
     it("should handle timeout errors", async () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
-      const error = new AxiosError("timeout of 5000ms exceeded");
+      const error = new Error("timeout of 5000ms exceeded") as Error & {
+        code?: string;
+      };
       error.code = "ECONNABORTED";
       mockedAxios.get.mockRejectedValueOnce(error);
 
@@ -152,20 +186,31 @@ describe("McpHandlers", () => {
 
       const mockResponse = {
         data: {
-          mcpServers: {
+          installed: [],
+          available: {
             "systemprompt-mcp-notion": {
-              command: undefined,
-              args: ["systemprompt-mcp-notion"],
-            },
-            default: {
-              command: "test-command",
-              args: ["--test"],
+              id: "notion",
+              type: "contrib",
+              title: "Notion",
+              description: "Notion integration",
+              environment_variables: ["NOTION_API_KEY"],
+              github_link: "https://github.com/test",
+              icon: "notion-icon",
+              npm_link: "https://npm.test",
+              metadata: {
+                created: "2024-01-01",
+                updated: "2024-01-01",
+                version: 1,
+                status: "active",
+              },
+              block: null,
+              prompt: null,
+              agent: [],
+              _link: "test-link",
             },
           },
         },
-        status: 200,
       };
-
       mockedAxios.get.mockResolvedValueOnce(mockResponse);
 
       const req = {} as Request;
@@ -179,12 +224,22 @@ describe("McpHandlers", () => {
           "systemprompt-mcp-notion": {
             command: "test-npx",
             args: ["/C", "npx.cmd", "systemprompt-mcp-notion"],
+            env: { NOTION_API_KEY: "" },
+            metadata: {
+              icon: "notion-icon",
+              description: "Notion integration",
+              title: "Notion",
+              type: "contrib",
+            },
+            agent: [],
           },
           default: {
             command: "test-command",
             args: ["--test"],
           },
         },
+        defaults: mockConfig.defaults,
+        available: mockResponse.data.available,
       });
     });
 
@@ -194,10 +249,27 @@ describe("McpHandlers", () => {
 
       const mockResponse = {
         data: {
-          mcpServers: {
+          installed: [],
+          available: {
             "systemprompt-mcp-notion": {
-              command: undefined,
-              args: [],
+              id: "notion",
+              type: "contrib",
+              title: "Notion",
+              description: "Notion integration",
+              environment_variables: ["NOTION_API_KEY"],
+              github_link: "https://github.com/test",
+              icon: "notion-icon",
+              npm_link: "https://npm.test",
+              metadata: {
+                created: "2024-01-01",
+                updated: "2024-01-01",
+                version: 1,
+                status: "active",
+              },
+              block: null,
+              prompt: null,
+              agent: [],
+              _link: "test-link",
             },
           },
         },
@@ -242,6 +314,7 @@ describe("McpHandlers", () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
       const mockResponse = {
         status: 401,
+        data: { error: "Unauthorized" },
       };
       mockedAxios.get.mockResolvedValueOnce(mockResponse);
 
@@ -277,7 +350,9 @@ describe("McpHandlers", () => {
 
     it("should handle timeout errors", async () => {
       process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
-      const error = new AxiosError("timeout of 5000ms exceeded");
+      const error = new Error("timeout of 5000ms exceeded") as Error & {
+        code?: string;
+      };
       error.code = "ECONNABORTED";
       mockedAxios.get.mockRejectedValueOnce(error);
 
@@ -328,6 +403,8 @@ describe("McpHandlers", () => {
               args: ["--test"],
             },
           },
+          available: {},
+          defaults: mockConfig.defaults,
         },
       } as Request;
       const mockRes = {
@@ -377,6 +454,8 @@ describe("McpHandlers", () => {
               args: ["--test"],
             },
           },
+          available: {},
+          defaults: mockConfig.defaults,
         },
       } as Request;
       const mockRes = {
@@ -416,12 +495,8 @@ describe("McpHandlers", () => {
             args: ["--custom"],
           },
         },
-        customServers: {
-          custom2: {
-            command: "custom2-command",
-            args: ["--custom2"],
-          },
-        },
+        available: {},
+        defaults: mockConfig.defaults,
       };
 
       const req = {
@@ -443,9 +518,8 @@ describe("McpHandlers", () => {
             default: mockConfig.mcpServers.default,
             custom: customConfig.mcpServers.custom,
           }),
-          customServers: expect.objectContaining({
-            custom2: customConfig.customServers.custom2,
-          }),
+          available: {},
+          defaults: mockConfig.defaults,
         })
       );
     });
@@ -462,6 +536,8 @@ describe("McpHandlers", () => {
             args: ["--new"],
           },
         },
+        available: {},
+        defaults: mockConfig.defaults,
       };
 
       const req = {
@@ -479,7 +555,8 @@ describe("McpHandlers", () => {
           ...mockConfig.mcpServers,
           ...newConfig.mcpServers,
         },
-        customServers: {},
+        available: {},
+        defaults: mockConfig.defaults,
       });
     });
   });

@@ -1,4 +1,4 @@
-import { SystempromptModule } from "./systemprompt";
+import { SystempromptAgent, SystempromptModule } from "./systemprompt";
 
 export interface ServerMetadata {
   icon?: string;
@@ -34,4 +34,5 @@ export interface McpData {
   mcpServers: Record<string, ServerConfig>;
   defaults: ServerDefaults;
   available: Record<string, SystempromptModule>;
+  agents: SystempromptAgent[];
 }

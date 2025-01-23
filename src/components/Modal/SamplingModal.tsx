@@ -84,9 +84,7 @@ export function SamplingModal({
         temperature: request.temperature,
         maxTokens: request.maxTokens,
         stopSequences: request.stopSequences?.join(", "),
-        responseSchema: request._meta?.responseSchema
-          ? JSON.stringify(request._meta.responseSchema, null, 2)
-          : undefined,
+        responseSchema: request._meta?.responseSchema,
       },
     },
   ];

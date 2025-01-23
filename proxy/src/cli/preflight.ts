@@ -1,13 +1,13 @@
-import chalk from "chalk";
-import ora from "ora";
-import fs from "fs/promises";
 import path from "path";
-import { input } from "@inquirer/prompts";
+import fs from "fs/promises";
+import ora from "ora";
+import chalk from "chalk";
 import {
   McpConfig,
   ServerConfig,
   BackendServerConfig,
 } from "../types/index.js";
+import { MCP_SERVER_URL } from "../handlers/mcpHandlers.js";
 
 // Required environment variables
 const REQUIRED_ENV_VARS = [
@@ -69,48 +69,31 @@ export async function validateEnvironmentVariables(): Promise<void> {
  * @returns Promise that resolves to the API key
  */
 export async function loadApiKey(): Promise<string> {
-  printSection("API Key Verification");
-
-  const envPath = ".env";
+  const spinner = ora("Verifying API key").start();
   const apiKeyName = "SYSTEMPROMPT_API_KEY";
+  const envPath = path.resolve(process.cwd(), ".env");
 
-  const spinner = ora({
-    text: "Checking for Systemprompt API key...",
-    color: "cyan",
-  }).start();
-
+  // Check if API key exists in process.env
   if (!process.env[apiKeyName]) {
-    spinner.info("API key not found in environment");
+    spinner.fail("API key not found in environment");
+    throw new Error("SYSTEMPROMPT_API_KEY is not set");
+  }
 
-    const apiKey = await input({
-      message: "Please enter your Systemprompt API key:",
-    });
-
-    try {
-      let envContent = "";
-      try {
-        envContent = await fs.readFile(envPath, "utf8");
-      } catch {
-        // File doesn't exist, start with empty content
-      }
-
-      const apiKeyLine = `${apiKeyName}=${apiKey}`;
-      if (envContent.includes(apiKeyName)) {
-        envContent = envContent.replace(
-          new RegExp(`${apiKeyName}=.*`),
-          apiKeyLine
-        );
-      } else {
-        envContent = envContent ? `${envContent}\n${apiKeyLine}` : apiKeyLine;
-      }
-
-      await fs.writeFile(envPath, envContent);
-      process.env[apiKeyName] = apiKey;
-      spinner.succeed("API key verified and saved");
-      return apiKey;
-    } catch (error) {
-      spinner.fail("Failed to save API key");
-      console.error(chalk.red("Error saving API key:"), error);
+  // Verify the API key exists in the .env file, not just process.env
+  try {
+    const envContent = await fs.readFile(envPath, "utf8");
+    if (!envContent?.includes(`${apiKeyName}=`)) {
+      spinner.fail("API key not found in .env file");
+      throw new Error(
+        "API key exists in process.env but not in .env file. Please add it to your .env file."
+      );
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      // Create .env file if it doesn't exist
+      await fs.writeFile(envPath, `${apiKeyName}=${process.env[apiKeyName]}\n`);
+    } else {
+      spinner.fail("Failed to verify API key in .env file");
       throw error;
     }
   }
@@ -154,9 +137,11 @@ export async function loadServerConfig(): Promise<McpConfig> {
     spinner.start("Loading servers from backend...");
     let backendServers: Record<string, BackendServerConfig> = {};
     try {
-      const response = await fetch("http://127.0.0.1/v1/mcp", {
+      const apiKey = await loadApiKey();
+      console.log("DEBUG: Using API key for backend request:", apiKey);
+      const response = await fetch(`${MCP_SERVER_URL}/v1/mcp`, {
         headers: {
-          "api-key": process.env.SYSTEMPROMPT_API_KEY || "",
+          "api-key": apiKey,
           "Content-Type": "application/json",
         },
       });
@@ -164,21 +149,6 @@ export async function loadServerConfig(): Promise<McpConfig> {
       if (response.ok) {
         const data = await response.json();
         backendServers = data.mcpServers || {};
-        console.log(
-          "Raw backend server data:",
-          JSON.stringify(data.mcpServers, null, 2)
-        );
-        console.log(
-          "Raw backend server commands:",
-          Object.entries(data.mcpServers || {}).map(([name, server]) => ({
-            name,
-            env: (server as BackendServerConfig).env,
-            metadata: (server as BackendServerConfig).metadata,
-            agent: (server as BackendServerConfig).agent,
-          }))
-        );
-
-        // Check each backend server for its extension
         Object.keys(backendServers).forEach((name) => {
           if (!availableExtensions.has(name)) {
             console.log(chalk.yellow("\n⚠️  Missing required extension:"));
@@ -265,8 +235,17 @@ export async function loadServerConfig(): Promise<McpConfig> {
       });
 
       // Convert backend servers to local configurations
+      console.log(
+        "DEBUG: Processing backend servers with env vars:",
+        process.env
+      );
       const processedBackendServers = Object.fromEntries(
         Object.entries(backendServers).map(([name, server]) => {
+          console.log(`DEBUG: Processing server ${name}:`, {
+            originalEnv: server.env,
+            processEnv: process.env,
+          });
+
           const serverPath = path.resolve(
             process.cwd(),
             path.normalize(path.join("extensions", name, "build", "index.js"))
@@ -274,8 +253,15 @@ export async function loadServerConfig(): Promise<McpConfig> {
 
           // Get API keys from the backend server config
           const apiKeys = Object.fromEntries(
-            (server.env || []).map((key) => [key, process.env[key] || ""])
+            (server.env || []).map((key) => {
+              console.log(
+                `DEBUG: Setting env key ${key} with value:`,
+                process.env[key]
+              );
+              return [key, process.env[key] || ""];
+            })
           );
+          console.log("DEBUG: Final apiKeys for server:", apiKeys);
 
           spinner.succeed(`Found backend server: ${name}`);
           console.log(`Backend server ${name} config:`, {
@@ -350,12 +336,14 @@ export async function loadServerConfig(): Promise<McpConfig> {
         })
       );
 
-      // Merge both sets of servers
-      const finalConfig: McpConfig = {
+      // Save the final configuration
+      const finalConfig = {
         mcpServers: {
-          ...processedCustomServers, // Custom servers first (lower priority)
-          ...processedBackendServers, // Backend servers override (higher priority)
+          ...processedCustomServers,
+          ...processedBackendServers,
         },
+        available: {},
+        agents: [],
       };
 
       console.log(
@@ -369,6 +357,10 @@ export async function loadServerConfig(): Promise<McpConfig> {
         _warning: "This file is automatically generated. DO NOT EDIT DIRECTLY.",
         ...finalConfig,
       };
+      console.log(
+        "DEBUG: Final config before saving:",
+        JSON.stringify(configWithWarning, null, 2)
+      );
       await fs.writeFile(
         configPath,
         JSON.stringify(configWithWarning, null, 2)
@@ -413,7 +405,7 @@ export async function loadUserConfig(apiKey: string): Promise<McpConfig> {
   }).start();
 
   try {
-    const response = await fetch("http://127.0.0.1/v1/user/mcp", {
+    const response = await fetch(`${MCP_SERVER_URL}/v1/user/mcp`, {
       headers: {
         "api-key": apiKey,
         "Content-Type": "application/json",

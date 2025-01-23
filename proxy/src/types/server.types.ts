@@ -1,3 +1,4 @@
+import { McpModuleMetadata } from "./index.js";
 import { SystempromptModule } from "./systemprompt.js";
 
 export interface ServerMetadata {
@@ -51,11 +52,10 @@ export interface ServerResponse {
 }
 
 export interface McpServer extends ServerConfig {
-  id?: string;
-  type?: string;
-  title?: string;
-  description?: string;
-  environment?: string[];
+  id: string;
+  type: string;
+  title: string;
+  description: string;
   metadata: ServerMetadata & Partial<McpModuleMetadata>;
 }
 

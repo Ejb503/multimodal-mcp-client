@@ -3,8 +3,10 @@ import { Icon } from "@iconify/react";
 import { BaseCard } from "./BaseCard";
 import { useState } from "react";
 import { ExternalLink } from "../Link/ExternalLink";
+import { useMcpData } from "@/contexts/McpDataContext";
 
 interface AvailableServerCardProps {
+  serverId: string;
   title: string;
   description: string;
   icon: string;
@@ -19,6 +21,7 @@ interface AvailableServerCardProps {
  * AvailableServerCard displays available MCP server information in a compact card layout
  */
 export function AvailableServerCard({
+  serverId,
   title,
   description,
   icon,
@@ -29,14 +32,12 @@ export function AvailableServerCard({
   className = "",
 }: AvailableServerCardProps) {
   const [isInstalling, setIsInstalling] = useState(false);
+  const { installServer } = useMcpData();
 
   const handleInstall = async () => {
     setIsInstalling(true);
     try {
-      // Mock HTTP request
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      // In a real implementation, we would make an API call here
-      console.log("Installing server:", title);
+      await installServer(serverId);
     } catch (error) {
       console.error("Error installing server:", error);
     } finally {

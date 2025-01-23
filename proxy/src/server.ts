@@ -7,7 +7,11 @@ import mcpProxy from "./mcpProxy.js";
 import { ConfigHandlers } from "./handlers/configHandlers.js";
 import { McpHandlers } from "./handlers/mcpHandlers.js";
 import { defaults } from "./config/defaults.js";
-import { loadServerConfig, loadUserConfig } from "./cli/preflight.js";
+import {
+  loadServerConfig,
+  loadUserConfig,
+  loadApiKey,
+} from "./cli/preflight.js";
 import { TransportManager } from "./transports/index.js";
 import chalk from "chalk";
 import { validateEnvironmentVariables } from "./cli/preflight.js";
@@ -49,9 +53,17 @@ export class ProxyServer {
       // First validate environment variables
       await validateEnvironmentVariables();
 
-      // Load server configurations
+      // Load and verify API key first
+      console.log(
+        chalk.cyan("\nBefore loadApiKey, process.env.SYSTEMPROMPT_API_KEY ="),
+        process.env.SYSTEMPROMPT_API_KEY
+      );
+      const apiKey = await loadApiKey();
+      console.log(chalk.cyan("After loadApiKey, using API key:"), apiKey);
+
+      // Load server configurations using the verified API key
       const config = await loadServerConfig();
-      await loadUserConfig(process.env.SYSTEMPROMPT_API_KEY || "");
+      await loadUserConfig(apiKey);
 
       const server = new ProxyServer(config);
 
@@ -117,6 +129,14 @@ export class ProxyServer {
       express.json(),
       this.mcpHandlers.handlePostConfigMcp.bind(this.mcpHandlers)
     );
+    this.app.post(
+      "/v1/mcp/install",
+      express.json(),
+      this.mcpHandlers.handleInstallMcp.bind(this.mcpHandlers)
+    );
+
+    // Refresh endpoint
+    this.app.post("/v1/mcp/refresh", this.handleRefresh.bind(this));
   }
 
   private async handleSSE(req: Request, res: Response): Promise<void> {
@@ -197,6 +217,39 @@ export class ProxyServer {
             error instanceof Error ? error.message : "Internal server error",
         });
       }
+    }
+  }
+
+  private async handleRefresh(req: Request, res: Response): Promise<void> {
+    try {
+      // Load fresh server configurations
+      const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+      if (!apiKey) {
+        throw new Error("API key not configured");
+      }
+
+      // Reload server and user configurations
+      const newConfig = await loadServerConfig();
+      await loadUserConfig(apiKey);
+
+      // Update transport manager with new configuration
+      await this.transportManager.refreshTransports(newConfig);
+
+      // Update handlers with new configuration
+      this.configHandlers = new ConfigHandlers(newConfig);
+      this.mcpHandlers = new McpHandlers(newConfig);
+
+      res
+        .status(200)
+        .json({ status: "Server configurations refreshed successfully" });
+    } catch (error) {
+      console.error("Error refreshing server configurations:", error);
+      res.status(500).json({
+        error:
+          error instanceof Error
+            ? error.message
+            : "Internal server error during refresh",
+      });
     }
   }
 

@@ -4,7 +4,7 @@ import { BaseCard } from "./BaseCard";
 interface UserInfoCardProps {
   userId: string;
   email: string;
-  apiKey: string;
+  // apiKey: string;
   roles: string[];
   onCopyApiKey: () => void;
   className?: string;
@@ -27,7 +27,7 @@ interface UserInfoCardProps {
 export function UserInfoCard({
   userId,
   email,
-  apiKey,
+  // apiKey,
   roles,
   onCopyApiKey,
   className = "",
@@ -43,17 +43,17 @@ export function UserInfoCard({
       value: email,
       type: "monospace",
     },
-    {
-      label: "API Key",
-      value: (
-        <div className="flex items-center gap-2">
-          <span className="font-mono">{apiKey.slice(0, 8)}...</span>
-          <Button size="sm" variant="flat" onPress={onCopyApiKey}>
-            Copy
-          </Button>
-        </div>
-      ),
-    },
+    // {
+    //   label: "API Key",
+    //   value: (
+    //     <div className="flex items-center gap-2">
+    //       <span className="font-mono">{apiKey.slice(0, 8)}...</span>
+    //       <Button size="sm" variant="flat" onPress={onCopyApiKey}>
+    //         Copy
+    //       </Button>
+    //     </div>
+    //   ),
+    // },
     {
       label: "Roles",
       value: (

@@ -8,7 +8,8 @@ export const geminiProvider: LlmProviderConfig = {
     apiKey: {
       type: "string",
       label: "API Key",
-      description: "Your Google Gemini API key",
+      description:
+        "Your Google Gemini API key (optional if set in VITE_GEMINI_API_KEY environment variable)",
       isSecret: true,
     },
     model: {

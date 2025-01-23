@@ -14,7 +14,8 @@ import { parseAndValidateJson } from "./utils/validation";
 const DEFAULT_MODEL = "gemini-2.0-flash-exp";
 const ERRORS = {
   NO_CONTENT: "No valid content found in messages",
-  NO_API_KEY: "Gemini API key not configured",
+  NO_API_KEY:
+    "Gemini API key not configured in environment variables (VITE_GEMINI_API_KEY)",
   NO_RESPONSE: "No response received from Gemini",
   VALIDATION_RETRY_FAILED: "JSON validation failed after retry attempt",
 } as const;
@@ -43,23 +44,19 @@ interface GeminiMessage {
 let genAI: GoogleGenerativeAI | null = null;
 
 /**
- * Initializes the Gemini API client with the provided API key
+ * Initialize the Gemini API client with the API key from environment variables
  */
-export function initializeGemini(apiKey: string): void {
-  genAI = new GoogleGenerativeAI(apiKey);
-}
+function ensureInitialized(config: GeminiConfigWithMeta) {
+  if (genAI) return;
 
-/**
- * Ensures the Gemini client is initialized
- * @throws {Error} If API key is not configured
- */
-function ensureInitialized(config: GeminiConfigWithMeta): void {
-  if (!genAI) {
-    if (!config.apiKey) {
-      throw new Error(ERRORS.NO_API_KEY);
-    }
-    initializeGemini(config.apiKey);
+  // Prioritize environment variable over config
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || config.apiKey;
+
+  if (!apiKey) {
+    throw new Error(ERRORS.NO_API_KEY);
   }
+
+  genAI = new GoogleGenerativeAI(apiKey);
 }
 
 /**

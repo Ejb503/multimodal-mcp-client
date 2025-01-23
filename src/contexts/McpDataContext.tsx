@@ -16,6 +16,7 @@ type McpDataState =
 interface McpDataContextType {
   state: McpDataState;
   refetch: () => Promise<void>;
+  installServer: (serverId: string) => Promise<void>;
 }
 
 const McpDataContext = createContext<McpDataContextType | null>(null);
@@ -51,6 +52,13 @@ const api = {
   async fetchMcpData(): Promise<McpData> {
     return fetchJson<McpData>("/v1/mcp");
   },
+  async installServer(serverId: string): Promise<void> {
+    // Simple POST to install endpoint
+    await fetchJson("/v1/mcp/install", {
+      method: "POST",
+      body: JSON.stringify({ serverId }),
+    });
+  },
 };
 
 export function McpDataProvider({ children }: { children: React.ReactNode }) {
@@ -72,6 +80,7 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
         user: userData,
         mcpData,
       });
+      console.log(mcpData);
     } catch (error) {
       console.error("Error fetching data:", error);
       setState({
@@ -80,6 +89,25 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, []);
+
+  const installServer = useCallback(
+    async (serverId: string) => {
+      try {
+        if (state.status !== "success") {
+          throw new Error(
+            "Cannot install server while loading or in error state"
+          );
+        }
+        await api.installServer(serverId);
+        // Refresh the data after installation
+        await fetchData();
+      } catch (error) {
+        console.error("Error installing server:", error);
+        throw error;
+      }
+    },
+    [fetchData, state]
+  );
 
   // Initial fetch
   useEffect(() => {
@@ -91,6 +119,7 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
       value={{
         state,
         refetch: fetchData,
+        installServer,
       }}
     >
       {children}
@@ -121,4 +150,12 @@ export function useMcpServerData() {
     throw new Error("Cannot access MCP data while loading or in error state");
   }
   return state.mcpData;
+}
+
+export function useMcpAgent() {
+  const { state } = useMcpData();
+  if (state.status !== "success") {
+    throw new Error("Cannot access MCP data while loading or in error state");
+  }
+  return state.mcpData.agents;
 }

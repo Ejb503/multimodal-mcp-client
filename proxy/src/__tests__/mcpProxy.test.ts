@@ -9,9 +9,6 @@ vi.mock("../handlers/mcpHandlers.js");
 vi.mock("../handlers/configHandlers.js");
 vi.mock("../handlers/transportHandlers.js");
 
-// Mock console.log
-const mockConsoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
-
 // Helper function to flush promises
 const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 
@@ -142,13 +139,10 @@ describe("mcpProxy function", () => {
 describe("McpProxy class", () => {
   it("initializes with default configuration", () => {
     const config: McpConfig = {
-      mcpServers: {
-        test: {
-          command: "test",
-        },
-      },
+      mcpServers: {},
+      defaults: defaults,
+      available: {},
     };
-
     const proxy = new McpProxy(config);
     expect(proxy).toBeDefined();
     expect(config.defaults).toEqual(defaults);
@@ -164,9 +158,11 @@ describe("McpProxy class", () => {
       mcpServers: {
         test: {
           command: "test",
+          args: ["--test"],
         },
       },
       defaults: customDefaults,
+      available: {},
     };
 
     const proxy = new McpProxy(config);

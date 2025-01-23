@@ -47,7 +47,6 @@ export class ConfigHandlers {
           apiKey,
           model: "gemini-pro",
           temperature: 0.7,
-          maxTokens: 100000,
         },
       });
     } catch (error) {
