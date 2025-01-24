@@ -1,16 +1,17 @@
 import { ServerDetails } from "@/features/server/components/sections/ServerDetails";
 import { useMcp } from "@/contexts/McpContext";
+import { useMcpData } from "@/contexts/McpDataContext";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button, Chip } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
-import type { ServerControlData } from "@/types/server";
+import type { ServerConfig } from "../../types/server.types";
 import { SystempromptModule } from "@/types/systemprompt";
 
 interface McpServerCardProps {
   serverId: string;
-  server: ServerControlData;
+  server: ServerConfig;
   availableInfo?: SystempromptModule;
   className?: string;
 }
@@ -27,11 +28,14 @@ export function McpServerCard({
 }: McpServerCardProps) {
   const navigate = useNavigate();
   const { clients, connectServer, disconnectServer } = useMcp();
+  const { uninstallServer } = useMcpData();
+  const isCustomModule = !availableInfo;
+
   const clientState = clients[serverId];
   const isConnected = clientState?.connectionStatus === "connected";
   const isConnecting = clientState?.connectionStatus === "pending";
   const [isExpanded, setIsExpanded] = useState(false);
-  const isCustomModule = !availableInfo;
+  const [isUninstalling, setIsUninstalling] = useState(false);
 
   const handleConnect = async () => {
     await connectServer(serverId);
@@ -39,6 +43,25 @@ export function McpServerCard({
 
   const handleDisconnect = async () => {
     await disconnectServer(serverId);
+  };
+
+  const handleUninstall = async () => {
+    if (!availableInfo) {
+      // Don't allow uninstalling custom servers
+      return;
+    }
+    if (isConnected) {
+      await handleDisconnect();
+    }
+    setIsUninstalling(true);
+    try {
+      // Send the UUID from availableInfo
+      await uninstallServer(availableInfo.id);
+    } catch (error) {
+      console.error("Error uninstalling server:", error);
+    } finally {
+      setIsUninstalling(false);
+    }
   };
 
   const toggleExpand = () => {
@@ -127,6 +150,22 @@ export function McpServerCard({
               }
             >
               Connect
+            </Button>
+          )}
+          {!isCustomModule && (
+            <Button
+              color="danger"
+              variant="light"
+              size="sm"
+              onClick={handleUninstall}
+              isLoading={isUninstalling}
+              startContent={
+                !isUninstalling && (
+                  <Icon icon="solar:trash-bin-minimalistic-bold-duotone" />
+                )
+              }
+            >
+              Uninstall
             </Button>
           )}
           <Button

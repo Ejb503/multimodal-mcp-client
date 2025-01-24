@@ -31,32 +31,7 @@ export function useMcpSampling(): SamplingHookReturn {
     ): Promise<CreateMessageResult> => {
       const progressToken = nextRequestId.current;
 
-      console.log("Debug - Sampling request initiated:", {
-        serverId,
-        timestamp: new Date().toISOString(),
-        availableClients: Object.keys(clients),
-        clientState: clients[serverId],
-        connectionStatus: clients[serverId]?.connectionStatus,
-        hasClient: Boolean(clients[serverId]?.client),
-        request: {
-          ...request,
-          _meta: {
-            ...request._meta,
-            progressToken,
-          },
-        },
-      });
-
       if (!clients[serverId]?.client) {
-        console.log("Debug - No client available for sampling:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-          clientsState: Object.entries(clients).map(([id, state]) => ({
-            id,
-            hasClient: Boolean(state.client),
-            status: state.connectionStatus,
-          })),
-        });
         throw createSamplingError(
           `No client available for server ${serverId}`,
           "NO_CLIENT"
@@ -72,13 +47,6 @@ export function useMcpSampling(): SamplingHookReturn {
       };
 
       return new Promise((resolve, reject) => {
-        console.log("Debug - Creating pending sample request:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-          requestId: nextRequestId.current,
-          currentPendingCount: pendingSampleRequests.length,
-        });
-
         setPendingSampleRequests((prev) => [
           ...prev,
           {

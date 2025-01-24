@@ -192,7 +192,11 @@ function ControlTray() {
               label="Select Agent"
             >
               {agents.map((agent) => (
-                <SelectItem key={agent.name} value={agent.name}>
+                <SelectItem
+                  key={agent.id}
+                  value={agent.id}
+                  textValue={agent.name}
+                >
                   {agent.name}
                 </SelectItem>
               ))}

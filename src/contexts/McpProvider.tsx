@@ -18,11 +18,15 @@ import {
   CallToolResult,
   Prompt,
   PromptMessage,
+  ListResourcesResult,
+  ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import { createSamplingError } from "../hooks/useMcpSampling.types";
 import type { PendingSampleRequest } from "../hooks/useMcpSampling.types";
 import type { z } from "zod";
 import { Component, ErrorInfo } from "react";
+import { AgentConfig } from "@/types/agent.types";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 class McpErrorBoundary extends Component<
   { children: React.ReactNode },
@@ -73,6 +77,27 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
   >([]);
   const nextRequestId = useRef(0);
 
+  const bootstrapServer = async (
+    serverId: string,
+    client: Client,
+    capabilities: ServerCapabilities
+  ) => {
+    if (capabilities && typeof capabilities === "object") {
+      const promises: Promise<void>[] = [];
+
+      if ("tools" in capabilities) {
+        promises.push(listTools(serverId, client));
+      }
+      if ("prompts" in capabilities) {
+        promises.push(listPrompts(serverId, client));
+      }
+      if ("resources" in capabilities) {
+        promises.push(listResources(serverId, client));
+      }
+      await Promise.all(promises);
+    }
+  };
+
   const requestSampling = async (
     serverId: string,
     request: CreateMessageRequest["params"],
@@ -116,7 +141,6 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
   ) => {
     const request = pendingSampleRequests.find((r) => r.id === requestId);
     if (!request) {
-      console.log("Debug - No pending request found:", { requestId });
       return;
     }
 
@@ -174,13 +198,6 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
   const { connectServer, disconnectServer } = useMcpConnection(
     updateClientState,
     (request, resolve, reject, serverId) => {
-      console.log("Debug - Handling sampling request from server:", {
-        serverId,
-        timestamp: new Date().toISOString(),
-        request,
-      });
-
-      // Add the request to pending requests for user approval
       setPendingSampleRequests((prev) => [
         ...prev,
         {
@@ -192,64 +209,62 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
           progress: undefined,
         },
       ]);
-    }
+    },
+    bootstrapServer
   );
 
-  const selectPrompt = async (serverId: string, promptId: string) => {
+  const listResources = async (serverId: string, providedClient?: Client) => {
     const clientState = clients[serverId];
-    if (!clientState?.client) return;
-
-    const result = await clientState.client.getPrompt({
-      name: promptId,
-      arguments: {
-        message: "Initializing MCP Prompt",
-      },
-    });
-
-    interface PromptMeta {
-      _meta?: {
-        prompt?: {
-          instruction?: {
-            static?: boolean;
-          };
-        };
-      };
-    }
-
-    if (!result || !(result as PromptMeta)._meta?.prompt?.instruction?.static) {
-      console.error("Couldn't get prompt");
-      return;
-    }
-
-    updateClientState(serverId, {
-      selectedPrompt: result,
-    });
-  };
-
-  const listResources = async (serverId: string) => {
-    const clientState = clients[serverId];
-    if (!clientState?.client) return;
-    const result = await clientState.client.listResources();
+    const client = providedClient || clientState?.client;
+    if (!client) return;
+    const result = await client.listResources();
+    listAgents(serverId, result);
     updateClientState(serverId, {
       resources: result.resources,
     });
   };
 
-  const listPrompts = async (serverId: string) => {
+  const listPrompts = async (serverId: string, providedClient?: Client) => {
     const clientState = clients[serverId];
-    if (!clientState?.client) return;
-    const result = await clientState.client.listPrompts();
+    const client = providedClient || clientState?.client;
+    if (!client) return;
+    const result = await client.listPrompts();
     updateClientState(serverId, {
       prompts: result.prompts,
     });
   };
 
-  const listTools = async (serverId: string) => {
+  const listTools = async (serverId: string, providedClient?: Client) => {
     const clientState = clients[serverId];
-    if (!clientState?.client) return;
-    const result = await clientState.client.listTools();
+    const client = providedClient || clientState?.client;
+    if (!client) return;
+    const result = await client.listTools();
     updateClientState(serverId, {
       tools: result.tools,
+    });
+  };
+
+  const listAgents = async (serverId: string, result: ListResourcesResult) => {
+    const agents = result.resources
+      .filter(
+        (
+          resource
+        ): resource is typeof resource & { _meta: { agent: boolean } } =>
+          typeof resource._meta === "object" &&
+          resource._meta !== null &&
+          "agent" in resource._meta &&
+          resource._meta.agent === true
+      )
+      .map<AgentConfig>((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        description: agent.description || "",
+        instruction: agent.description || "",
+        tools: [],
+        resources: [],
+      }));
+    updateClientState(serverId, {
+      agents: agents,
     });
   };
 
@@ -343,10 +358,10 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
       value={{
         clients,
         activeClients,
+        bootstrapServer,
         connectServer,
         disconnectServer: (serverId: string) =>
           disconnectServer(serverId, clients[serverId]?.client),
-        selectPrompt,
         listResources,
         listPrompts,
         listTools,

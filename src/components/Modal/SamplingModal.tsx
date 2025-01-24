@@ -44,8 +44,7 @@ export function SamplingModal({
         },
         _meta: request._meta as McpMeta,
       });
-      console.log("LLM Result", result);
-      // Create response object
+
       const response: CreateMessageResult = {
         role: "assistant",
         content: {

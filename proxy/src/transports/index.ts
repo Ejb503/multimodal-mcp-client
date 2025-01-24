@@ -50,16 +50,10 @@ export class TransportManager {
 
   constructor(config: McpConfig) {
     this.config = config;
-    console.log(
-      "Transport manager initialized with config:",
-      Object.entries(config.mcpServers)
-        .filter(([name]) => name.startsWith("systemprompt-mcp-"))
-        .map(([name, server]) => ({
-          name,
-          command: server.command,
-          args: server.args,
-        }))
-    );
+  }
+
+  public updateConfig(newConfig: McpConfig): void {
+    this.config = newConfig;
   }
 
   public validateTransportParams(query: Request["query"]): TransportParams {
@@ -76,7 +70,6 @@ export class TransportManager {
 
   public async createTransport(query: Request["query"]): Promise<Transport> {
     const { transportType, serverId } = this.validateTransportParams(query);
-    console.log(`Creating ${transportType} transport for server ${serverId}`);
 
     let transport: Transport;
     if (transportType === "stdio") {
@@ -93,10 +86,15 @@ export class TransportManager {
   private async createStdioTransport(
     serverId: string
   ): Promise<StdioClientTransport> {
-    console.log(this.config.mcpServers);
-    const serverConfig = this.config.mcpServers[serverId];
+    let serverConfig = Object.values(this.config.mcpServers).find(
+      (server) => server.id === serverId
+    );
     if (!serverConfig) {
-      throw new Error(`No configuration found for server1: ${serverId}`);
+      serverConfig = this.config.mcpServers[serverId];
+    }
+
+    if (!serverConfig) {
+      throw new Error(`No configuration found for server: ${serverId}`);
     }
 
     if (!serverConfig.command || serverConfig.command.trim() === "") {
@@ -105,7 +103,6 @@ export class TransportManager {
 
     // Map environment variables
     const env = mapEnvironmentVariables(serverConfig.env);
-
     const transport = new StdioClientTransport({
       command: serverConfig.command,
       args: serverConfig.args || [],
@@ -143,7 +140,6 @@ export class TransportManager {
     const transport = new SSEClientTransport(url);
     try {
       await transport.start();
-      console.log(`SSE transport started successfully for server ${serverId}`);
       return transport;
     } catch (error) {
       console.error(
@@ -211,7 +207,6 @@ export class TransportManager {
     const index = this.webAppTransports.indexOf(transport);
     if (index > -1) {
       this.webAppTransports.splice(index, 1);
-      console.log("Web app transport removed");
     }
   }
 
@@ -222,7 +217,6 @@ export class TransportManager {
   }
 
   public async cleanup(): Promise<void> {
-    console.log("Cleaning up transport resources...");
     await Promise.all(
       this.webAppTransports.map(async (transport) => {
         try {
@@ -233,13 +227,9 @@ export class TransportManager {
       })
     );
     this.webAppTransports = [];
-    console.log("Transport cleanup complete");
   }
 
   public async refreshTransports(newConfig: McpConfig): Promise<void> {
-    console.log("Refreshing transports with new configuration");
-
-    // Store old config for comparison
     const oldConfig = this.config;
 
     // Update the configuration
@@ -251,7 +241,6 @@ export class TransportManager {
     // Close and remove transports for servers that no longer exist
     for (const [serverId, transport] of this.activeTransports.entries()) {
       if (!newServerIds.has(serverId)) {
-        console.log(`Closing transport for removed server: ${serverId}`);
         await transport.close?.();
         this.activeTransports.delete(serverId);
       }
@@ -266,7 +255,6 @@ export class TransportManager {
         oldServer &&
         JSON.stringify(oldServer) !== JSON.stringify(newServer)
       ) {
-        console.log(`Updating transport for modified server: ${serverId}`);
         const existingTransport = this.activeTransports.get(serverId);
         if (existingTransport) {
           await existingTransport.close?.();
@@ -274,7 +262,5 @@ export class TransportManager {
         }
       }
     }
-
-    console.log("Transport refresh complete");
   }
 }

@@ -1,5 +1,5 @@
 import { Tool, Resource } from "@modelcontextprotocol/sdk/types.js";
-import { LiveConfig } from "@/features/multimodal-agent/multimodal-live-types";
+import { LiveConfig } from "./multimodal-live-types";
 
 export interface PromptPost {
   instruction: {
@@ -28,40 +28,22 @@ export interface PromptPost {
 }
 
 export interface AgentConfig {
+  id: string;
   name: string;
   description: string;
   instruction: string;
-  knowledge: string;
-  voice: string;
   tools: Array<{
     name: string;
     description: string;
     parameters: Record<string, unknown>;
   }>;
   resources: Resource[];
-  dependencies: string[];
-  config: {
-    model: string;
-    generationConfig: {
-      responseModalities: "audio" | "image" | "text";
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: {
-            voiceName: string;
-          };
-        };
-      };
-    };
-  };
+  _source: "user" | "system";
 }
 
 export interface AgentRegistryContextType {
   agents: AgentConfig[];
   activeAgent: string | null;
-  loadAgents: () => Promise<void>;
-  saveAgent: (agent: AgentConfig) => Promise<void>;
-  deleteAgent: (agentName: string) => Promise<void>;
-  getAgent: (agentName: string) => AgentConfig | null;
   setActiveAgent: (agentName: string | null) => void;
   tools: Tool[];
   resources: Resource[];

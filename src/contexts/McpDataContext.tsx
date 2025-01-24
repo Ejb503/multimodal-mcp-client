@@ -1,3 +1,4 @@
+//** This is Global styate, needs renaming **//
 import {
   createContext,
   useContext,
@@ -17,6 +18,7 @@ interface McpDataContextType {
   state: McpDataState;
   refetch: () => Promise<void>;
   installServer: (serverId: string) => Promise<void>;
+  uninstallServer: (serverId: string) => Promise<void>;
 }
 
 const McpDataContext = createContext<McpDataContextType | null>(null);
@@ -53,10 +55,15 @@ const api = {
     return fetchJson<McpData>("/v1/mcp");
   },
   async installServer(serverId: string): Promise<void> {
-    // Simple POST to install endpoint
     await fetchJson("/v1/mcp/install", {
       method: "POST",
-      body: JSON.stringify({ serverId }),
+      body: JSON.stringify({ moduleId: serverId }),
+    });
+  },
+  async uninstallServer(moduleId: string): Promise<void> {
+    await fetchJson("/v1/mcp/uninstall", {
+      method: "DELETE",
+      body: JSON.stringify({ moduleId }),
     });
   },
 };
@@ -68,19 +75,16 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
     setState({ status: "loading" });
 
     try {
-      // Fetch user and MCP data in parallel
       const [userData, mcpData] = await Promise.all([
         api.fetchUserData(),
         api.fetchMcpData(),
       ]);
 
-      // Update state with the fetched data
       setState({
         status: "success",
         user: userData,
         mcpData,
       });
-      console.log(mcpData);
     } catch (error) {
       console.error("Error fetching data:", error);
       setState({
@@ -109,6 +113,25 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
     [fetchData, state]
   );
 
+  const uninstallServer = useCallback(
+    async (serverId: string) => {
+      try {
+        if (state.status !== "success") {
+          throw new Error(
+            "Cannot uninstall server while loading or in error state"
+          );
+        }
+        await api.uninstallServer(serverId);
+        // Refresh the data after uninstallation
+        await fetchData();
+      } catch (error) {
+        console.error("Error uninstalling server:", error);
+        throw error;
+      }
+    },
+    [fetchData, state]
+  );
+
   // Initial fetch
   useEffect(() => {
     fetchData();
@@ -120,6 +143,7 @@ export function McpDataProvider({ children }: { children: React.ReactNode }) {
         state,
         refetch: fetchData,
         installServer,
+        uninstallServer,
       }}
     >
       {children}

@@ -4,7 +4,6 @@ import {
   CardBody,
   CardHeader,
   Button,
-  Chip,
   Spinner,
   ButtonGroup,
   Tooltip,
@@ -43,13 +42,6 @@ function AgentCard({ agent, onEdit, isActive, onSetActive }: AgentCardProps) {
         <div className="flex flex-col gap-4">
           {/* Agent Details */}
           <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap gap-1">
-              {agent.dependencies.map((dep) => (
-                <Chip key={dep} size="sm" variant="flat">
-                  {dep}
-                </Chip>
-              ))}
-            </div>
             <div className="flex items-center gap-2 text-small text-default-400">
               <Icon icon="solar:widget-line-duotone" />
               <span>{agent.tools.length} tools</span>
@@ -136,26 +128,14 @@ function EmptyState({ onCreateAgent }: { onCreateAgent: () => void }) {
 }
 
 export default function AgentGalleryPage() {
-  const { agents, loadAgents, activeAgent, setActiveAgent } =
-    useAgentRegistry();
+  const { agents, activeAgent, setActiveAgent } = useAgentRegistry();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        await loadAgents();
-      } catch (err) {
-        console.error("Failed to load agents:", err);
-        setError("Failed to load agents");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [loadAgents]);
+    // Set loading to false after initial render
+    setLoading(false);
+  }, []);
 
   const handleCreateAgent = () => {
     navigate("/agent/create");
@@ -166,7 +146,7 @@ export default function AgentGalleryPage() {
   };
 
   const handleSetActive = (agent: AgentConfig) => {
-    setActiveAgent(agent.name);
+    setActiveAgent(agent.id);
   };
 
   if (loading) {
@@ -195,13 +175,7 @@ export default function AgentGalleryPage() {
         </Button>
       </div>
 
-      {error ? (
-        <Card className="bg-danger-50">
-          <CardBody>
-            <p className="text-danger">{error}</p>
-          </CardBody>
-        </Card>
-      ) : agents.length === 0 ? (
+      {agents.length === 0 ? (
         <EmptyState onCreateAgent={handleCreateAgent} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -210,7 +184,7 @@ export default function AgentGalleryPage() {
               key={agent.name}
               agent={agent}
               onEdit={handleEditAgent}
-              isActive={agent.name === activeAgent}
+              isActive={agent.id === activeAgent}
               onSetActive={handleSetActive}
             />
           ))}

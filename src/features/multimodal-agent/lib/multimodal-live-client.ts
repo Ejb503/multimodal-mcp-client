@@ -19,7 +19,7 @@ import {
   ToolCallCancellation,
   ToolResponseMessage,
   type LiveConfig,
-} from "../multimodal-live-types";
+} from "../../../types/multimodal-live-types";
 import { blobToJSON, base64ToArrayBuffer } from "./utils";
 import { useLogStore } from "@/stores/log-store";
 
@@ -84,8 +84,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     ws.addEventListener("message", async (evt: MessageEvent) => {
       if (evt.data instanceof Blob) {
         this.receive(evt.data);
-      } else {
-        console.log("non blob message", evt);
       }
     });
     return new Promise((resolve, reject) => {
@@ -114,7 +112,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
         ws.removeEventListener("error", onError);
         ws.addEventListener("close", (ev: CloseEvent) => {
-          console.log(ev);
           this.disconnect(ws);
           let reason = ev.reason || "";
           if (reason.toLowerCase().includes("error")) {
@@ -158,15 +155,12 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
       )) as LiveIncomingMessage;
 
       if (isToolCallMessage(response)) {
-        console.log("Processing tool call message:", response);
         this.log("Tool Call", response, "info");
-        console.log("Emitting toolcall event");
         this.emit("toolcall", response.toolCall);
         return;
       }
 
       if (isToolCallCancellationMessage(response)) {
-        console.log("Processing tool call cancellation:", response);
         this.log("Tool Call Cancellation", response, "warning");
         this.emit("toolcallcancellation", response.toolCallCancellation);
         return;
@@ -183,12 +177,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
         if (isModelTurn(serverContent)) {
           let parts: Part[] = serverContent.modelTurn.parts;
-
-          // Check for executable code
-          const executableParts = parts.filter((p) => "executableCode" in p);
-          if (executableParts.length > 0) {
-            console.log("Found executable code parts:", executableParts);
-          }
 
           const audioParts = parts.filter(
             (p) => p.inlineData && p.inlineData.mimeType.startsWith("audio/pcm")

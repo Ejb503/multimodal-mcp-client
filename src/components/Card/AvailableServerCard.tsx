@@ -7,6 +7,7 @@ import { useMcpData } from "@/contexts/McpDataContext";
 
 interface AvailableServerCardProps {
   serverId: string;
+  id: string; // UUID from the backend
   title: string;
   description: string;
   icon: string;
@@ -22,6 +23,7 @@ interface AvailableServerCardProps {
  */
 export function AvailableServerCard({
   serverId,
+  id,
   title,
   description,
   icon,
@@ -37,7 +39,8 @@ export function AvailableServerCard({
   const handleInstall = async () => {
     setIsInstalling(true);
     try {
-      await installServer(serverId);
+      // Use the UUID for installation
+      await installServer(id);
     } catch (error) {
       console.error("Error installing server:", error);
     } finally {

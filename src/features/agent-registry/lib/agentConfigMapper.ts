@@ -1,5 +1,5 @@
 import { SystempromptAgent } from "@/types/systemprompt";
-import { AgentConfig } from "./types";
+import { AgentConfig } from "../../../types/agent.types";
 import { Resource } from "@modelcontextprotocol/sdk/types.js";
 
 export interface AgentCustomization {

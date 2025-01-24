@@ -23,6 +23,7 @@ export interface BackendServerConfig {
 }
 
 export interface ServerConfig {
+  id: string; // Module ID from the backend
   command: string;
   args: string[];
   env?: Record<string, string>;

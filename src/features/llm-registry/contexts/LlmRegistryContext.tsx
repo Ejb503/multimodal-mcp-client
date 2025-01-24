@@ -2,7 +2,6 @@ import {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   ReactNode,
 } from "react";
@@ -11,7 +10,6 @@ import {
   LlmProviderInstance,
   LlmRegistryContextType,
 } from "../lib/types";
-import { readLlmConfig } from "@/utils/config";
 
 const LlmRegistryContext = createContext<LlmRegistryContextType | null>(null);
 
@@ -24,36 +22,17 @@ export function LlmRegistryProvider({ children }: Props) {
   const [instances, setInstances] = useState<Map<string, LlmProviderInstance>>(
     new Map()
   );
-  const [activeProvider, setActiveProvider] = useState<string | null>("gemini");
-  const [providerConfig, setProviderConfig] = useState<Record<string, unknown>>(
-    {
-      apiKey: "",
-      model: "gemini-2.0-flash-exp",
-      temperature: 0.7,
-      maxTokens: 1000,
-    }
-  );
-
-  // Load configuration from llm.json on startup
-  useEffect(() => {
-    const loadConfig = async () => {
-      try {
-        const config = await readLlmConfig();
-        if (config.provider) {
-          setActiveProvider(config.provider);
-          setProviderConfig(config.config || {});
-        }
-      } catch (error) {
-        console.error("Failed to load LLM configuration:", error);
-      }
-    };
-
-    loadConfig();
-  }, []);
+  // Todo, add more providers
+  const [activeProvider] = useState<string | null>("gemini");
+  const [providerConfig] = useState<Record<string, unknown>>({
+    apiKey: "",
+    model: "gemini-2.0-flash-exp",
+    temperature: 0.7,
+    maxTokens: 1000,
+  });
 
   const registerProvider = useCallback(
     (config: LlmProviderConfig, instance: LlmProviderInstance) => {
-      console.log("Registering provider:", config.id);
       setProviders((prev) => {
         if (prev.some((p) => p.id === config.id)) {
           return prev;

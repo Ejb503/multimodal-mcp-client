@@ -37,8 +37,6 @@ export class TransportHandlers {
    */
   private async createTransport(query: Request["query"]): Promise<Transport> {
     const { transportType, serverId } = this.validateTransportParams(query);
-    console.log(`Creating ${transportType} transport for server ${serverId}`);
-
     if (transportType === "stdio") {
       return this.createStdioTransport(serverId);
     }
@@ -56,8 +54,6 @@ export class TransportHandlers {
     if (!serverConfig) {
       throw new Error(`No configuration found for server2: ${serverId}`);
     }
-
-    console.log(`Setting up stdio transport for server ${serverId}`);
     const env = serverConfig.env
       ? { ...(process.env as Record<string, string>), ...serverConfig.env }
       : (process.env as Record<string, string>);
@@ -75,9 +71,6 @@ export class TransportHandlers {
 
     try {
       await transport.start();
-      console.log(
-        `Stdio transport started successfully for server ${serverId}`
-      );
       return transport;
     } catch (error) {
       console.error(
@@ -97,8 +90,6 @@ export class TransportHandlers {
     if (!this.config.sse?.systemprompt) {
       throw new Error(`SSE configuration is not available`);
     }
-
-    console.log(`Setting up SSE transport for server ${serverId}`);
     const serverConfig = this.config.sse.systemprompt;
     const url = new URL(serverConfig.url);
     const requestInit: RequestInit = {
@@ -110,7 +101,6 @@ export class TransportHandlers {
     const transport = new SSEClientTransport(url, { requestInit });
     try {
       await transport.start();
-      console.log(`SSE transport started successfully for server ${serverId}`);
       return transport;
     } catch (error) {
       console.error(
@@ -185,7 +175,6 @@ export class TransportHandlers {
     const index = this.webAppTransports.indexOf(webAppTransport);
     if (index > -1) {
       this.webAppTransports.splice(index, 1);
-      console.log("Web app transport removed");
     }
   }
 
@@ -198,10 +187,7 @@ export class TransportHandlers {
       const webAppTransport = new SSEServerTransport("/message", res);
 
       this.webAppTransports.push(webAppTransport);
-      console.log("Starting web app transport");
       await webAppTransport.start();
-      console.log("Web app transport started");
-
       const isConnected = true;
 
       if (
@@ -275,7 +261,6 @@ export class TransportHandlers {
   }
 
   public async cleanup(): Promise<void> {
-    console.log("Cleaning up transport resources...");
     await Promise.all(
       this.webAppTransports.map(async (transport) => {
         try {
@@ -286,6 +271,5 @@ export class TransportHandlers {
       })
     );
     this.webAppTransports = [];
-    console.log("Transport cleanup complete");
   }
 }

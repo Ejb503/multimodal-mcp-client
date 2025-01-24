@@ -10,6 +10,7 @@ export interface ServerMetadata {
 }
 
 export interface ServerConfig {
+  id: string;
   command: string;
   args: string[];
   env?: string[];

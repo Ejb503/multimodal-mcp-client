@@ -20,17 +20,6 @@ export function useMcpClient() {
 
   const updateClientState = useCallback(
     (serverId: string, update: Partial<McpClientState>) => {
-      console.log("Debug - Updating client state:", {
-        serverId,
-        timestamp: new Date().toISOString(),
-        currentState: clients[serverId] || DEFAULT_CLIENT_STATE,
-        update: {
-          hasClient: Boolean(update.client),
-          connectionStatus: update.connectionStatus,
-          toolCount: update.tools?.length,
-        },
-      });
-
       setClients((prev) => {
         const currentState = prev[serverId] || DEFAULT_CLIENT_STATE;
         const newState = {
@@ -40,17 +29,6 @@ export function useMcpClient() {
             ...update,
           },
         };
-
-        console.log("Debug - Client state updated:", {
-          serverId,
-          timestamp: new Date().toISOString(),
-          newState: {
-            hasClient: Boolean(newState[serverId]?.client),
-            connectionStatus: newState[serverId]?.connectionStatus,
-            toolCount: newState[serverId]?.tools?.length,
-          },
-        });
-
         return newState;
       });
     },
@@ -63,8 +41,6 @@ export function useMcpClient() {
         method: string;
         params?: unknown;
       }) => {
-        console.log("Notification received:", notification);
-
         if (notification.method === "notifications/progress") {
           const params = notification.params as ProgressNotification["params"];
           const clientState = clients[serverId] || DEFAULT_CLIENT_STATE;

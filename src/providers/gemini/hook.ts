@@ -46,7 +46,6 @@ export function useGeminiProvider() {
       setError(null);
 
       try {
-        console.log("Executing prompt with meta:", _meta);
         const config = {
           model: "gemini-2.0-flash-exp",
           temperature:

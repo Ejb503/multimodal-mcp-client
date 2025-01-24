@@ -41,7 +41,6 @@ export class McpApiService {
     options: RequestInit = {}
   ): Promise<T> {
     const url = new URL(endpoint, this._baseUrl);
-    console.log("Fetching from:", url.toString());
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -65,7 +64,6 @@ export class McpApiService {
 
   private async postToApi<T>(endpoint: string, data: unknown): Promise<T> {
     const url = new URL(endpoint, this._baseUrl).toString();
-    console.log("Posting to:", url);
     const response = await fetch(url, {
       method: "POST",
       headers: {

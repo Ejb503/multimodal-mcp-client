@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { useMcp } from "@/contexts/McpContext";
-import type { ServerCapabilities } from "@/contexts/McpContext.types";
 import {
   GetPromptRequest,
   GetPromptResult,
@@ -9,6 +7,7 @@ import {
   Tool,
   CreateMessageRequest,
   CreateMessageResult,
+  ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useGlobalLlm } from "@/contexts/LlmProviderContext";
 import { McpMeta } from "@/types/mcp";
@@ -80,17 +79,17 @@ export function useServer({ onError, serverId }: UseServerOptions): {
   } = useMcp();
 
   const llmProvider = useGlobalLlm();
-
-  const [error, setError] = useState<Error | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
-
   const clientState = clients[serverId];
 
+  // Derive state entirely from MCP Provider state
   const state: ServerState = {
     isConnected: clientState?.connectionStatus === "connected",
-    isConnecting: isConnecting || clientState?.connectionStatus === "pending",
-    hasError: clientState?.connectionStatus === "error" || error !== null,
-    error,
+    isConnecting: clientState?.connectionStatus === "pending",
+    hasError: clientState?.connectionStatus === "error",
+    error:
+      clientState?.connectionStatus === "error"
+        ? new Error("Connection error")
+        : null,
     tools: clientState?.tools || [],
     prompts: clientState?.prompts || [],
     resources: clientState?.resources || [],
@@ -106,28 +105,24 @@ export function useServer({ onError, serverId }: UseServerOptions): {
     serverInfo: clientState?.serverInfo,
   };
 
+  // Actions that wrap provider functions with error handling
   const actions: ServerActions = {
     connect: async () => {
       try {
-        setIsConnecting(true);
-        setError(null);
         await connectServer(serverId);
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
-        setError(err);
         onError?.(err);
-      } finally {
-        setIsConnecting(false);
+        throw err;
       }
     },
     disconnect: async () => {
       try {
         await disconnectServer(serverId);
-        setError(null);
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
-        setError(err);
         onError?.(err);
+        throw err;
       }
     },
     fetchTools: async () => {
@@ -137,6 +132,7 @@ export function useServer({ onError, serverId }: UseServerOptions): {
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         onError?.(err);
+        throw err;
       }
     },
     executeTool: async (toolName: string, params: Record<string, unknown>) => {
@@ -155,6 +151,7 @@ export function useServer({ onError, serverId }: UseServerOptions): {
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         onError?.(err);
+        throw err;
       }
     },
     selectPrompt: async (promptName: string) => {
@@ -163,17 +160,16 @@ export function useServer({ onError, serverId }: UseServerOptions): {
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         onError?.(err);
+        throw err;
       }
     },
     getPromptDetails: async (
       request: GetPromptRequest["params"]
     ): Promise<GetPromptResult> => {
       try {
-        const clientState = clients[serverId];
         if (!clientState?.client) {
           throw new Error("No MCP client available");
         }
-        console.log("request", request);
         return await clientState.client.getPrompt(request);
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
@@ -220,12 +216,12 @@ export function useServer({ onError, serverId }: UseServerOptions): {
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         onError?.(err);
+        throw err;
       }
     },
     readResource: async (resourceUri: string) => {
       try {
-        const result = await readResource(serverId, resourceUri);
-        return result;
+        return await readResource(serverId, resourceUri);
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         onError?.(err);

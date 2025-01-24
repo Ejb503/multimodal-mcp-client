@@ -90,14 +90,6 @@ export function useSidebarItems() {
           href: "/agents",
           color: "primary",
         },
-        {
-          key: "create-agent",
-          label: "Create Agent",
-          icon: "solar:add-circle-line-duotone",
-          description: "Create a new agent",
-          href: "/agent/create",
-          color: "primary",
-        },
       ],
     },
   ];
@@ -112,8 +104,8 @@ export function useSidebarItems() {
     title: "Logs",
     items: [
       {
-        key: "settings",
-        label: "Settings",
+        key: "log",
+        label: "View logs",
         icon: "solar:settings-line-duotone",
         description: "View logs",
         href: "/logs",
@@ -122,19 +114,19 @@ export function useSidebarItems() {
     ],
   });
 
-  sections.push({
-    title: "Settings",
-    items: [
-      {
-        key: "settings",
-        label: "Settings",
-        icon: "solar:settings-line-duotone",
-        description: "Configure MCP settings",
-        href: "/settings",
-        color: "primary",
-      },
-    ],
-  });
+  // sections.push({
+  //   title: "Settings",
+  //   items: [
+  //     {
+  //       key: "settings",
+  //       label: "Settings",
+  //       icon: "solar:settings-line-duotone",
+  //       description: "Configure MCP settings",
+  //       href: "/settings",
+  //       color: "primary",
+  //     },
+  //   ],
+  // });
 
   sections.push({
     title: "Help",

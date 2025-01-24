@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { MultimodalLiveAPIClientConnection } from "../lib/multimodal-live-client";
 import MultimodalLiveClient from "../lib/multimodal-live-client";
-import { ToolCall } from "../multimodal-live-types";
+import { ToolCall } from "../../../types/multimodal-live-types";
 import { AudioStreamer } from "../lib/audio-streamer";
 import { audioContext } from "../lib/utils";
 import VolMeterWorket from "../lib/worklets/vol-meter";
@@ -64,7 +64,6 @@ export function useLiveAPI({
 
   const handleToolCall = useCallback(
     async (toolCall: ToolCall) => {
-      console.log(toolCall);
       const currentClient = clientRef.current;
       if (!currentClient) {
         console.error("Cannot execute tool call - no client");

@@ -5,4 +5,7 @@ export { AgentRegistryProvider } from "./contexts/AgentRegistryContext";
 export { useAgentRegistry } from "./contexts/AgentRegistryContext";
 
 // Export types
-export type { AgentConfig, AgentRegistryContextType } from "./lib/types";
+export type {
+  AgentConfig,
+  AgentRegistryContextType,
+} from "../../types/agent.types";

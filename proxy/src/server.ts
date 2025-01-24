@@ -116,23 +116,36 @@ export class ProxyServer {
     );
 
     // MCP routes
-    this.app.get(
-      "/v1/mcp",
-      this.mcpHandlers.handleGetMcp.bind(this.mcpHandlers)
-    );
+    this.app.get("/v1/mcp", async (req: Request, res: Response) => {
+      try {
+        const response = await this.mcpHandlers.handleGetMcp(req, res);
+        // Update transport manager's config with the new config
+        if (response) {
+          this.transportManager.updateConfig(response);
+        }
+      } catch (error) {
+        console.error("Error in /v1/mcp route:", error);
+        if (!res.headersSent) {
+          res.status(500).json({
+            error:
+              error instanceof Error ? error.message : "Internal server error",
+          });
+        }
+      }
+    });
     this.app.get(
       "/v1/user/mcp",
       this.mcpHandlers.handleGetUserMcp.bind(this.mcpHandlers)
     );
     this.app.post(
-      "/v1/config/mcp",
-      express.json(),
-      this.mcpHandlers.handlePostConfigMcp.bind(this.mcpHandlers)
-    );
-    this.app.post(
       "/v1/mcp/install",
       express.json(),
       this.mcpHandlers.handleInstallMcp.bind(this.mcpHandlers)
+    );
+    this.app.delete(
+      "/v1/mcp/uninstall",
+      express.json(),
+      this.mcpHandlers.handleUninstallMcp.bind(this.mcpHandlers)
     );
 
     // Refresh endpoint

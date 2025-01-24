@@ -146,6 +146,7 @@ export default function ControlPage() {
                   <AvailableServerCard
                     key={key}
                     serverId={key}
+                    id={server.id}
                     title={server.title}
                     description={server.description}
                     icon={server.icon}

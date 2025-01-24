@@ -136,6 +136,25 @@ describe("preflight", () => {
               icon: "notion-icon",
             },
           },
+          defaults: {
+            serverTypes: {
+              stdio: {
+                icon: "stdio-icon",
+                color: "primary",
+                description: "Local stdio server",
+              },
+              sse: {
+                icon: "sse-icon",
+                color: "primary",
+                description: "Remote SSE server",
+              },
+            },
+            unconnected: {
+              icon: "unconnected-icon",
+              color: "warning",
+              description: "Not connected",
+            },
+          },
         },
       };
 
@@ -217,6 +236,25 @@ describe("preflight", () => {
               environment_variables: ["OTHER_KEY"],
             },
           },
+          defaults: {
+            serverTypes: {
+              stdio: {
+                icon: "stdio-icon",
+                color: "primary",
+                description: "Local stdio server",
+              },
+              sse: {
+                icon: "sse-icon",
+                color: "primary",
+                description: "Remote SSE server",
+              },
+            },
+            unconnected: {
+              icon: "unconnected-icon",
+              color: "warning",
+              description: "Not connected",
+            },
+          },
         },
       };
 
@@ -285,6 +323,9 @@ describe("preflight", () => {
 
       expect(result.mcpServers).toBeDefined();
       expect(Object.keys(result.mcpServers)).toContain("custom-server");
+      expect(Object.keys(result.mcpServers)).not.toContain(
+        "systemprompt-mcp-notion"
+      );
     });
   });
 

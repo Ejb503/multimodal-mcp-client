@@ -63,7 +63,6 @@ function ensureInitialized(config: GeminiConfigWithMeta) {
  * Determines the type of response needed based on configuration
  */
 function determineResponseType(config: GeminiConfigWithMeta): ResponseType {
-  console.log("Config:", config);
   if (config._meta?.complexResponseSchema) {
     return {
       type: "complex_schema",
@@ -212,7 +211,6 @@ async function processResponse(
       // First attempt
       const firstAttempt = parseAndValidateJson(text, responseType.schema);
       if (!firstAttempt.error) {
-        console.log("First Attempt:", firstAttempt.data);
         return { response: JSON.stringify(firstAttempt.data) };
       }
 
@@ -236,7 +234,6 @@ async function processResponse(
           error: `${ERRORS.VALIDATION_RETRY_FAILED}: ${secondAttempt.error}`,
         };
       }
-      console.log("Second Attempt:", secondAttempt.data);
       return { response: JSON.stringify(secondAttempt.data) };
     }
     case "schema":
@@ -257,20 +254,13 @@ export async function generateLlmResponse(
       throw new Error(ERRORS.NO_CONTENT);
     }
 
-    console.log(
-      "Received config in generateLlmResponse:",
-      JSON.stringify(config, null, 2)
-    );
     ensureInitialized(config);
 
     const responseType = determineResponseType(config);
-    console.log("Determined response type:", responseType);
-
     let formattedMessages = formatMessages(messages);
     const modelConfig = createModelConfig(config, responseType);
 
     if (responseType.type === "complex_schema") {
-      console.log("Handling complex schema with:", responseType.schema);
       formattedMessages = appendSchemaInstruction(
         formattedMessages,
         responseType.schema
@@ -285,7 +275,6 @@ export async function generateLlmResponse(
     const result = await model.generateContent(formattedMessages);
     const response = await result.response;
     const text = response.text().trim();
-    console.log("Gemini Response", text);
 
     return processResponse(text, responseType, model, formattedMessages);
   } catch (error) {

@@ -9,6 +9,7 @@ import type {
   ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
+import { AgentConfig } from "./agent.types";
 
 export type ToolCall = z.infer<typeof CallToolResultSchema>;
 
@@ -21,6 +22,7 @@ export interface McpClientState {
   resources: Resource[];
   prompts: Prompt[];
   tools: Tool[];
+  agents: AgentConfig[];
   loadedResources: string[];
   serverInfo?: {
     name: string;
@@ -48,6 +50,7 @@ export interface McpContextType {
   clients: Record<string, McpClientState>;
   /** List of currently connected server IDs */
   activeClients: string[];
+  bootstrapServer: (serverId: string) => Promise<void>;
   /** Connect to a server by its ID */
   connectServer: (serverId: string) => Promise<void>;
   /** Disconnect from a server by its ID */

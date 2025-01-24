@@ -25,26 +25,13 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
         client.connectionStatus === "connected" &&
         (!client.tools || client.tools.length === 0)
       ) {
-        console.log(
-          "Client connected but no tools found, attempting to fetch tools..."
-        );
-        // Trigger tool refresh for this client
         if (client.client?.listTools) {
-          client.client
-            .listTools()
-            .then((result) => {
-              if (result.tools && result.tools.length > 0) {
-                console.log(
-                  `Loaded ${result.tools.length} tools for client ${serverId}`
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `Failed to load tools for client ${serverId}:`,
-                error
-              );
-            });
+          client.client.listTools().catch((error) => {
+            console.error(
+              `Failed to load tools for client ${serverId}:`,
+              error
+            );
+          });
         }
       }
     });
@@ -54,7 +41,6 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
     toolName: string,
     args: Record<string, unknown>
   ) => {
-    console.log(toolName, args);
     const maxRetries = 3;
     let lastError: Error | null = null;
 
@@ -74,9 +60,6 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
           await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
           continue;
         }
-
-        console.log(availableTools);
-        console.log(toolName);
         const mcpTool = availableTools.find((tool) => tool.name === toolName);
         if (!mcpTool) {
           throw new Error(

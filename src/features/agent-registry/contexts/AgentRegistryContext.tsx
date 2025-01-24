@@ -6,43 +6,47 @@ import {
   useCallback,
   ReactNode,
 } from "react";
-import { AgentConfig, AgentRegistryContextType } from "../lib/types";
-import { readAgentConfig, writeAgentConfig } from "@/utils/config";
+import {
+  AgentConfig,
+  AgentRegistryContextType,
+} from "../../../types/agent.types";
 import { Resource, Tool } from "@modelcontextprotocol/sdk/types.js";
-import { LiveConfig } from "@/features/multimodal-agent/multimodal-live-types";
 import { useMcp } from "@/contexts/McpContext";
 import { mapToolsToGeminiFormat } from "@/features/multimodal-agent/utils/tool-mappers";
+import { LiveConfig } from "@/types/multimodal-live-types";
+import { useMcpAgent } from "@/contexts/McpDataContext";
+import { SystempromptAgent } from "@/types/systemprompt";
 
 const AgentRegistryContext = createContext<AgentRegistryContextType | null>(
   null
 );
 
+const mapMcpAgentToConfig = (agent: SystempromptAgent): AgentConfig => {
+  return {
+    id: agent.id,
+    name: agent.metadata.title,
+    description: agent.metadata.description,
+    instruction: agent.content,
+    tools: [], // Tools will be added from server context
+    resources: [], // Resources will be added from server context
+    _source: "user" as const,
+  };
+};
+
 interface Props {
   children: ReactNode;
 }
 
-const defaultConfig = {
-  model: "models/gemini-2.0-flash-exp",
-  generationConfig: {
-    responseModalities: "audio" as const,
-    speechConfig: {
-      voiceConfig: {
-        prebuiltVoiceConfig: {
-          voiceName: "Kore",
-        },
-      },
-    },
-  },
-};
-
 export function AgentRegistryProvider({ children }: Props) {
   const { clients, activeClients } = useMcp();
+  const backendAgents = useMcpAgent();
   const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [tools, setTools] = useState<Tool[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
   const [activeTools, setActiveTools] = useState<Tool[]>([]);
   const [activeResources, setActiveResources] = useState<Resource[]>([]);
+
   const [config, setConfig] = useState<LiveConfig>({
     model: "models/gemini-2.0-flash-exp",
     generationConfig: {
@@ -54,35 +58,18 @@ export function AgentRegistryProvider({ children }: Props) {
     systemInstruction: {
       parts: [{ text: "test" }],
     },
-    tools: [{ googleSearch: {} }],
+    tools: [{ googleSearch: {}, codeExecution: {} }],
   });
 
-  // Load agents
-  const loadAgents = useCallback(async () => {
-    try {
-      const config = await readAgentConfig();
-      const agentsWithConfig = (config.agents || []).map(
-        (
-          agent: Omit<AgentConfig, "config"> & {
-            config?: AgentConfig["config"];
-          }
-        ) => ({
-          ...agent,
-          config: agent.config || defaultConfig,
-        })
-      );
-      setAgents(agentsWithConfig);
-      if (!activeAgent && agentsWithConfig.length > 0) {
-        setActiveAgent(agentsWithConfig[0].name);
-      }
-    } catch (error) {
-      console.error("Failed to load agent configuration:", error);
-      setAgents([]);
-      throw error;
+  useEffect(() => {
+    if (!activeAgent && agents.length > 0) {
+      // Find the first user-defined agent, or fall back to the first agent if none exists
+      const defaultAgent =
+        agents.find((a) => a._source === "user") || agents[0];
+      setActiveAgent(defaultAgent.id);
     }
-  }, [activeAgent]);
+  }, [agents, activeAgent]);
 
-  // Update tools and resources from MCP
   useEffect(() => {
     const allTools = activeClients.reduce<Tool[]>((acc, clientId) => {
       const client = clients[clientId];
@@ -93,7 +80,7 @@ export function AgentRegistryProvider({ children }: Props) {
     }, []);
     setTools(allTools);
     setActiveTools(allTools);
-    setConfig((prevConfig) => {
+    setConfig((prevConfig: LiveConfig) => {
       const parsedTools = mapToolsToGeminiFormat(allTools);
       return {
         ...prevConfig,
@@ -115,37 +102,44 @@ export function AgentRegistryProvider({ children }: Props) {
       return acc;
     }, []);
     setResources(allResources);
-    setActiveResources(allResources); // Set all resources as active by default
-  }, [clients, activeClients]);
+    setActiveResources(allResources);
 
-  // Update config when active tools/resources change
+    // Map and combine both server and backend agents
+    const serverAgents = activeClients.reduce<AgentConfig[]>(
+      (acc, clientId) => {
+        const client = clients[clientId];
+        if (client?.agents) {
+          return [
+            ...acc,
+            ...client.agents.map((agent) => ({
+              ...agent,
+              _source: "system" as const,
+            })),
+          ];
+        }
+        return acc;
+      },
+      []
+    );
+
+    const mappedBackendAgents = backendAgents.map(mapMcpAgentToConfig);
+
+    // Prioritize backend agents by putting them first
+    setAgents([...mappedBackendAgents, ...serverAgents]);
+  }, [clients, activeClients, backendAgents]);
+
+  // Update config when active agent changes
   useEffect(() => {
     if (activeAgent) {
-      const agent = agents.find((a) => a.name === activeAgent);
-
+      const agent = agents.find((a) => a.id === activeAgent);
       if (agent) {
         setConfig((prevConfig) => ({
           ...prevConfig,
-          ...agent.config,
           systemInstruction: {
             parts: [
               {
                 text: agent.instruction,
               },
-              // {
-              //   text: `The resources you have available are: ${JSON.stringify(
-              //     activeResources,
-              //     null,
-              //     2
-              //   )}`,
-              // },
-              // {
-              //   text: `The tools you have available are: ${JSON.stringify(
-              //     activeTools,
-              //     null,
-              //     2
-              //   )}`,
-              // },
             ],
           },
         }));
@@ -175,55 +169,11 @@ export function AgentRegistryProvider({ children }: Props) {
     });
   }, []);
 
-  useEffect(() => {
-    loadAgents().catch(console.error);
-  }, [loadAgents]);
-
-  const saveAgent = useCallback(
-    async (agent: AgentConfig) => {
-      try {
-        const newAgents = agents.filter((a) => a.name !== agent.name);
-        newAgents.push(agent);
-        await writeAgentConfig({ agents: newAgents });
-        setAgents(newAgents);
-      } catch (error) {
-        console.error("Failed to save agent:", error);
-        throw error;
-      }
-    },
-    [agents]
-  );
-
-  const deleteAgent = useCallback(
-    async (agentName: string) => {
-      try {
-        const newAgents = agents.filter((a) => a.name !== agentName);
-        await writeAgentConfig({ agents: newAgents });
-        setAgents(newAgents);
-      } catch (error) {
-        console.error("Failed to delete agent:", error);
-        throw error;
-      }
-    },
-    [agents]
-  );
-
-  const getAgent = useCallback(
-    (agentName: string) => {
-      return agents.find((a) => a.name === agentName) || null;
-    },
-    [agents]
-  );
-
   return (
     <AgentRegistryContext.Provider
       value={{
         agents,
         activeAgent,
-        loadAgents,
-        saveAgent,
-        deleteAgent,
-        getAgent,
         setActiveAgent,
         tools,
         resources,

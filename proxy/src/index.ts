@@ -60,9 +60,7 @@ export async function main() {
   console.log(chalk.yellow("Looking for .env at:"), envPath);
 
   try {
-    const envContents = await fs.readFile(envPath, "utf-8");
     console.log(chalk.green("\n.env file contents:"));
-    console.log(envContents);
   } catch (error) {
     console.log(
       chalk.red("\nCould not read .env file:"),
