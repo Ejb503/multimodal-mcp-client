@@ -245,7 +245,7 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
   };
 
   const listAgents = async (serverId: string, result: ListResourcesResult) => {
-    const agents = result.resources
+    const newAgents = result.resources
       .filter(
         (
           resource
@@ -256,16 +256,30 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
           resource._meta.agent === true
       )
       .map<AgentConfig>((agent) => ({
-        id: agent.id,
-        name: agent.name,
+        id: String(agent.id),
+        name: String(agent.name),
         description: agent.description || "",
         instruction: agent.description || "",
         tools: [],
         resources: [],
+        _source: "system",
       }));
-    updateClientState(serverId, {
-      agents: agents,
-    });
+
+    // Get current agents
+    const currentAgents = clients[serverId]?.agents || [];
+
+    // Filter out agents that already exist by ID
+    const uniqueNewAgents = newAgents.filter(
+      (newAgent) =>
+        !currentAgents.some((existingAgent) => existingAgent.id === newAgent.id)
+    );
+
+    // Only update if we have new unique agents
+    if (uniqueNewAgents.length > 0) {
+      updateClientState(serverId, {
+        agents: [...currentAgents, ...uniqueNewAgents],
+      });
+    }
   };
 
   const executeTool = async (

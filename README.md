@@ -1,4 +1,4 @@
-# Systemprompt MCP Client
+# Systemprompt Multimodal MCP Client
 
 <div align="center">
 

@@ -128,19 +128,19 @@ export function useSidebarItems() {
   //   ],
   // });
 
-  sections.push({
-    title: "Help",
-    items: [
-      {
-        key: "help",
-        label: "Help",
-        icon: "solar:info-circle-line-duotone",
-        description: "Get help with MCP",
-        href: "/help",
-        color: "primary",
-      },
-    ],
-  });
+  // sections.push({
+  //   title: "Help",
+  //   items: [
+  //     {
+  //       key: "help",
+  //       label: "Help",
+  //       icon: "solar:info-circle-line-duotone",
+  //       description: "Get help with MCP",
+  //       href: "/help",
+  //       color: "primary",
+  //     },
+  //   ],
+  // });
 
   return { sections, handleItemClick };
 }

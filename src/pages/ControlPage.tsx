@@ -160,6 +160,47 @@ export default function ControlPage() {
             )}
           </CardBody>
         </Card>
+
+        <Card>
+          <CardBody className="flex items-center justify-center text-center py-8">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="text-6xl">
+                <i className="solar:discord-bold-duotone" />
+              </div>
+              <h2 className="text-xl font-medium">
+                Want More Extensions? Having Trouble?
+              </h2>
+              <div className="space-y-2">
+                <p className="text-default-500">
+                  Join our Discord community to request extensions, get help,
+                  and discuss new features!
+                </p>
+                <p className="text-default-500">
+                  Love the client? See potential? Support our open source
+                  development by starring us on GitHub and sharing with others!
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <a
+                  href="https://discord.com/invite/wkAbSuPWpr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Join Discord
+                </a>
+                <a
+                  href="https://github.com/Ejb503/multimodal-mcp-client"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-default-100 hover:bg-default-200 px-4 py-2 rounded-lg transition-colors"
+                >
+                  ⭐ Star on GitHub
+                </a>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

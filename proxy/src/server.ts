@@ -28,7 +28,7 @@ export class ProxyServer {
   private server: ReturnType<Express["listen"]> | null = null;
   private isShuttingDown = false;
 
-  constructor(config: McpConfig) {
+  private constructor(config: McpConfig) {
     const fullConfig = {
       ...config,
       defaults,
@@ -40,12 +40,10 @@ export class ProxyServer {
     this.mcpHandlers = new McpHandlers(fullConfig);
 
     this.setupMiddleware();
-    this.setupRoutes();
   }
 
   /**
-   * Creates a new ProxyServer instance with config file checking
-   * @param config Initial configuration
+   * Creates a new ProxyServer instance with config file checking and proper initialization sequence
    * @returns Promise that resolves to a new ProxyServer instance
    */
   public static async create(): Promise<ProxyServer> {
@@ -61,11 +59,15 @@ export class ProxyServer {
       const apiKey = await loadApiKey();
       console.log(chalk.cyan("After loadApiKey, using API key:"), apiKey);
 
-      // Load server configurations using the verified API key
-      const config = await loadServerConfig();
+      // Load initial configurations
+      const initialConfig = await loadServerConfig();
       await loadUserConfig(apiKey);
 
-      const server = new ProxyServer(config);
+      // Create server with initial config
+      const server = new ProxyServer(initialConfig);
+
+      // Set up routes after initial configuration
+      server.setupRoutes();
 
       // Handle process signals for cleanup
       const cleanup = async () => {
@@ -73,16 +75,14 @@ export class ProxyServer {
         console.log("\nGracefully shutting down...");
         server.isShuttingDown = true;
         await server.cleanup();
-        process.exit(0); // Exit after cleanup since this is a SIGINT/SIGTERM
+        process.exit(0);
       };
 
-      // Handle both SIGINT (Ctrl+C) and SIGTERM
       process.once("SIGINT", cleanup);
       process.once("SIGTERM", cleanup);
 
       return server;
     } catch (error) {
-      // If CLI setup fails, log error and exit immediately
       console.error("\n❌ Failed during CLI setup:", error);
       process.exit(1);
     }

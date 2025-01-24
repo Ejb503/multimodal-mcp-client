@@ -66,7 +66,9 @@ export function AgentRegistryProvider({ children }: Props) {
       // Find the first user-defined agent, or fall back to the first agent if none exists
       const defaultAgent =
         agents.find((a) => a._source === "user") || agents[0];
-      setActiveAgent(defaultAgent.id);
+      if (defaultAgent) {
+        setActiveAgent(defaultAgent.id);
+      }
     }
   }, [agents, activeAgent]);
 
@@ -124,8 +126,23 @@ export function AgentRegistryProvider({ children }: Props) {
 
     const mappedBackendAgents = backendAgents.map(mapMcpAgentToConfig);
 
-    // Prioritize backend agents by putting them first
-    setAgents([...mappedBackendAgents, ...serverAgents]);
+    // Create a map of agents by ID, preferring user agents over system agents
+    const uniqueAgents = new Map<string, AgentConfig>();
+
+    // First add all user agents (from backend)
+    mappedBackendAgents.forEach((agent) => {
+      uniqueAgents.set(agent.id, agent);
+    });
+
+    // Then add system agents, but only if an agent with that ID doesn't already exist
+    serverAgents.forEach((agent) => {
+      if (!uniqueAgents.has(agent.id)) {
+        uniqueAgents.set(agent.id, agent);
+      }
+    });
+
+    // Convert map back to array
+    setAgents(Array.from(uniqueAgents.values()));
   }, [clients, activeClients, backendAgents]);
 
   // Update config when active agent changes
