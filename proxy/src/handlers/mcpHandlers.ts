@@ -153,15 +153,35 @@ export class McpHandlers {
       }
     });
 
-    const allAgents: McpAgent[] = Object.values(response.available).reduce(
-      (agents, moduleInfo) => {
-        if (moduleInfo.agent && moduleInfo.agent.length > 0) {
+    const allAgents: McpAgent[] = Object.entries(response.available).reduce(
+      (agents, [moduleName, moduleInfo]) => {
+        // Only include agents from installed modules
+        if (moduleInfo.agent && moduleInfo.agent.length > 0 && installedModules.has(moduleName)) {
           return [...agents, ...moduleInfo.agent];
         }
         return agents;
       },
       [] as McpAgent[]
     );
+
+    // Add custom agents from config
+    Object.entries(this.config.customAgents || {}).forEach(([id, agentInfo]) => {
+      allAgents.push({
+        id,
+        type: "custom",
+        content: agentInfo.instruction,
+        metadata: {
+          title: agentInfo.name,
+          description: agentInfo.description,
+          tag: [],
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+          version: 1,
+          status: "active"
+        },
+        _link: ""
+      });
+    });
 
     return {
       ...this.config,

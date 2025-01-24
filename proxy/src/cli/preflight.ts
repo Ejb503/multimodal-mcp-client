@@ -138,7 +138,6 @@ export async function loadServerConfig(): Promise<McpConfig> {
     let backendServers: Record<string, BackendServerConfig> = {};
     try {
       const apiKey = await loadApiKey();
-      console.log("DEBUG: Using API key for backend request:", apiKey);
       const response = await fetch(`${MCP_SERVER_URL}/v1/mcp`, {
         headers: {
           "api-key": apiKey,
@@ -315,7 +314,19 @@ export async function loadServerConfig(): Promise<McpConfig> {
         },
         available: {},
         agents: [],
+        customAgents: {},
       };
+
+      // Load custom agents if they exist
+      try {
+        const agentConfigPath = path.join("config", "agent.config.custom.json");
+        const agentConfigStr = await fs.readFile(agentConfigPath, "utf-8");
+        const agentConfig = JSON.parse(agentConfigStr);
+        finalConfig.customAgents = agentConfig;
+      } catch (error) {
+        spinner.info("No custom agents found");
+      }
+
       // Save the processed config back to mcp.config.json
       const configPath = path.join("config", "mcp.config.json");
       const configWithWarning = {

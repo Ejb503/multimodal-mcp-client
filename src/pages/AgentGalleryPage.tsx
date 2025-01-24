@@ -1,17 +1,8 @@
-import { Button } from "@nextui-org/react";
-import { useNavigate } from "react-router-dom";
-import { Icon } from "@iconify/react";
 import { useAgentRegistry, AgentConfig } from "@/features/agent-registry";
 import { AgentCard } from "@/components/Card/AgentCard";
 
 export default function AgentGalleryPage() {
   const { agents, activeAgent, setActiveAgent } = useAgentRegistry();
-  const navigate = useNavigate();
-
-  const handleCreateAgent = () => {
-    navigate("/agent/create");
-  };
-
   const handleSetActive = (agent: AgentConfig) => {
     setActiveAgent(agent.id);
   };
@@ -25,13 +16,6 @@ export default function AgentGalleryPage() {
             Manage and interact with your AI agents
           </p>
         </div>
-        <Button
-          color="primary"
-          startContent={<Icon icon="solar:add-circle-line-duotone" />}
-          onPress={handleCreateAgent}
-        >
-          Create Agent
-        </Button>
       </div>
       <div className="flex flex-col gap-6">
         {agents.map((agent) => (

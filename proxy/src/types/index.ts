@@ -49,11 +49,18 @@ export interface SSEConfig {
   apiKey: string;
 }
 
+export interface CustomAgent {
+  name: string;
+  description: string;
+  instruction: string;
+}
+
 export interface McpConfig {
   mcpServers: Record<string, ServerConfig>;
   available: Record<string, McpModuleInfo>;
   defaults?: ServerDefaults;
   agents: SystempromptAgent[];
+  customAgents?: Record<string, CustomAgent>;
 }
 
 export interface JsonRpcMessage {
