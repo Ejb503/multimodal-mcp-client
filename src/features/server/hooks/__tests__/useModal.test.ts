@@ -4,54 +4,64 @@ import { useModal } from "../useModal";
 
 describe("useModal", () => {
   it("should initialize with closed state", () => {
-    const { result } = renderHook(() => useModal());
-    expect(result.current.isOpen).toBe(false);
-    expect(result.current.mode).toBeNull();
+    const { result } = renderHook(() => useModal<{ name: string }>());
+    expect(result.current.viewModalOpen).toBe(false);
+    expect(result.current.executeModalOpen).toBe(false);
+    expect(result.current.selectedPrompt).toBeNull();
   });
 
-  it("should open modal with specified mode", () => {
-    const { result } = renderHook(() => useModal());
+  it("should open view modal with selected item", () => {
+    const { result } = renderHook(() => useModal<{ name: string }>());
+    const testItem = { name: "test" };
+
     act(() => {
-      result.current.open("view");
+      result.current.handleOpenViewModal(testItem);
     });
-    expect(result.current.isOpen).toBe(true);
-    expect(result.current.mode).toBe("view");
+
+    expect(result.current.viewModalOpen).toBe(true);
+    expect(result.current.executeModalOpen).toBe(false);
+    expect(result.current.selectedPrompt).toBe(testItem);
   });
 
-  it("should close modal and reset mode", () => {
-    const { result } = renderHook(() => useModal());
-    act(() => {
-      result.current.open("execute");
-    });
-    expect(result.current.isOpen).toBe(true);
-    expect(result.current.mode).toBe("execute");
+  it("should open execute modal with selected item", () => {
+    const { result } = renderHook(() => useModal<{ name: string }>());
+    const testItem = { name: "test" };
 
     act(() => {
-      result.current.close();
+      result.current.handleOpenExecuteModal(testItem);
     });
-    expect(result.current.isOpen).toBe(false);
-    expect(result.current.mode).toBeNull();
+
+    expect(result.current.executeModalOpen).toBe(true);
+    expect(result.current.viewModalOpen).toBe(false);
+    expect(result.current.selectedPrompt).toBe(testItem);
   });
 
-  it("should handle multiple open/close cycles", () => {
-    const { result } = renderHook(() => useModal());
+  it("should close modals and reset selected item", () => {
+    const { result } = renderHook(() => useModal<{ name: string }>());
+    const testItem = { name: "test" };
+
+    // Open and close view modal
+    act(() => {
+      result.current.handleOpenViewModal(testItem);
+    });
+    expect(result.current.viewModalOpen).toBe(true);
 
     act(() => {
-      result.current.open("view");
+      result.current.handleCloseViewModal();
     });
-    expect(result.current.isOpen).toBe(true);
-    expect(result.current.mode).toBe("view");
+    expect(result.current.viewModalOpen).toBe(false);
+    expect(result.current.selectedPrompt).toBeNull();
+
+    // Open and close execute modal
+    act(() => {
+      result.current.handleOpenExecuteModal(testItem);
+    });
+    expect(result.current.executeModalOpen).toBe(true);
 
     act(() => {
-      result.current.close();
+      result.current.handleCloseExecuteModal();
     });
-    expect(result.current.isOpen).toBe(false);
-    expect(result.current.mode).toBeNull();
-
-    act(() => {
-      result.current.open("execute");
-    });
-    expect(result.current.isOpen).toBe(true);
-    expect(result.current.mode).toBe("execute");
+    expect(result.current.executeModalOpen).toBe(false);
+    expect(result.current.selectedPrompt).toBeNull();
   });
 });

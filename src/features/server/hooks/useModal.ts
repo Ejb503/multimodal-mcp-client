@@ -2,62 +2,48 @@ import { useState } from "react";
 
 export type ModalMode = "view" | "execute" | null;
 
-interface UseModalReturn {
-  isOpen: boolean;
-  mode: ModalMode;
-  open: (
-    mode: Exclude<ModalMode, null>,
-    options?: {
-      title?: string;
-      description?: string;
-      parameters?: Record<string, { type: string; description?: string }>;
-      onSubmit?: (params: Record<string, unknown>) => Promise<void>;
-    }
-  ) => void;
-  close: () => void;
-  options?: {
-    title?: string;
-    description?: string;
-    parameters?: Record<string, { type: string; description?: string }>;
-    onSubmit?: (params: Record<string, unknown>) => Promise<void>;
-  };
+export interface UseModalReturn<T> {
+  viewModalOpen: boolean;
+  executeModalOpen: boolean;
+  selectedPrompt: T | null;
+  handleOpenViewModal: (item: T) => void;
+  handleOpenExecuteModal: (item: T) => void;
+  handleCloseViewModal: () => void;
+  handleCloseExecuteModal: () => void;
 }
 
-export function useModal(): UseModalReturn {
-  const [isOpen, setIsOpen] = useState(false);
-  const [mode, setMode] = useState<ModalMode>(null);
-  const [options, setOptions] = useState<{
-    title?: string;
-    description?: string;
-    parameters?: Record<string, { type: string; description?: string }>;
-    onSubmit?: (params: Record<string, unknown>) => Promise<void>;
-  }>();
+export function useModal<T>(): UseModalReturn<T> {
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [executeModalOpen, setExecuteModalOpen] = useState(false);
+  const [selectedPrompt, setSelectedPrompt] = useState<T | null>(null);
 
-  const open = (
-    newMode: Exclude<ModalMode, null>,
-    newOptions?: {
-      title?: string;
-      description?: string;
-      parameters?: Record<string, { type: string; description?: string }>;
-      onSubmit?: (params: Record<string, unknown>) => Promise<void>;
-    }
-  ) => {
-    setMode(newMode);
-    setIsOpen(true);
-    setOptions(newOptions);
+  const handleOpenViewModal = (item: T) => {
+    setSelectedPrompt(item);
+    setViewModalOpen(true);
   };
 
-  const close = () => {
-    setIsOpen(false);
-    setMode(null);
-    setOptions(undefined);
+  const handleOpenExecuteModal = (item: T) => {
+    setSelectedPrompt(item);
+    setExecuteModalOpen(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setViewModalOpen(false);
+    setSelectedPrompt(null);
+  };
+
+  const handleCloseExecuteModal = () => {
+    setExecuteModalOpen(false);
+    setSelectedPrompt(null);
   };
 
   return {
-    isOpen,
-    mode,
-    open,
-    close,
-    options,
+    viewModalOpen,
+    executeModalOpen,
+    selectedPrompt,
+    handleOpenViewModal,
+    handleOpenExecuteModal,
+    handleCloseViewModal,
+    handleCloseExecuteModal,
   };
 }

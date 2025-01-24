@@ -4,240 +4,300 @@ import { BaseCard } from "@/components/Card";
 import { StatusIndicator } from "@/components/StatusIndicator/StatusIndicator";
 import { PromptCard } from "@/components/Card/PromptCard";
 import { ExecutionHistoryCard } from "@/components/Card/ExecutionHistoryCard";
-import { PromptModal } from "@/components/Modal/PromptModal";
 import { RefreshButton } from "@/components/Button";
-import { useLogStore } from "@/stores/log-store";
+import type {
+  Prompt,
+  GetPromptResult,
+  GetPromptRequest,
+} from "@modelcontextprotocol/sdk/types.js";
+import { PromptModal } from "@/components/Modal/PromptModal";
+import { getErrorMessage } from "../../utils/prompt-utils";
+import { useModal } from "../../hooks/useModal";
+import { useSchemaParameters } from "@/utils/useSchemaParameters";
+import { usePromptLogger } from "../../hooks/usePromptLogger";
+import { createSchemaFromPromptArgs } from "@/utils/useSchemaParameters";
+import type { LlmResponse } from "@/providers/gemini/types";
 
-interface PromptParameter {
-  type: string;
-  description?: string;
-}
-
-interface ValidationError {
-  path: string[];
-  message: string;
-}
-
-interface Prompt {
-  name: string;
-  description?: string;
-  type?: string;
-  inputSchema?: {
-    type: "object";
-    properties?: Record<string, PromptParameter>;
-    required?: string[];
-  };
-}
-
-interface PromptsSectionProps {
+export interface PromptsSectionProps {
   prompts: Prompt[];
-  isLoading: boolean;
-  onFetchPrompts?: () => Promise<void>;
-  hasListPromptsCapability: boolean;
-  error: boolean;
-  onExecutePrompt: (
-    name: string,
-    params: Record<string, unknown>
-  ) => Promise<unknown>;
   onGetPromptDetails: (
-    name: string,
-    args?: Record<string, string>
-  ) => Promise<Prompt>;
+    params: GetPromptRequest["params"]
+  ) => Promise<GetPromptResult>;
+  onExecutePrompt: (params: GetPromptRequest["params"]) => Promise<LlmResponse>;
+  isConnected: boolean;
+  error?: string;
 }
 
 export function PromptsSection({
   prompts,
-  isLoading: isLoadingPrompts,
-  onFetchPrompts,
-  hasListPromptsCapability,
-  error,
-  onExecutePrompt,
   onGetPromptDetails,
+  onExecutePrompt,
+  isConnected,
+  error,
 }: PromptsSectionProps) {
-  const [selectedPrompt, setSelectedPrompt] = React.useState<Prompt | null>(
-    null
-  );
+  const { logSuccess, logError } = usePromptLogger();
+  const {
+    viewModalOpen,
+    executeModalOpen,
+    selectedPrompt,
+    handleOpenViewModal,
+    handleOpenExecuteModal,
+    handleCloseViewModal,
+    handleCloseExecuteModal,
+  } = useModal<Prompt>();
+  const {
+    values,
+    errors: validationErrors,
+    setValue,
+    reset,
+    createEmptyValues,
+    setValues,
+    validate,
+  } = useSchemaParameters();
+
+  const [executeResult, setExecuteResult] = React.useState<string>();
+  const [executeError, setExecuteError] = React.useState<string>();
+  const [viewResult, setViewResult] = React.useState<GetPromptResult>();
+  const [viewError, setViewError] = React.useState<string>();
   const [isExecuting, setIsExecuting] = React.useState(false);
-  const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [promptResult, setPromptResult] = React.useState<unknown>(null);
-  const [paramValues, setParamValues] = React.useState<Record<string, string>>(
-    {}
-  );
-  const [validationErrors, setValidationErrors] = React.useState<
-    ValidationError[]
-  >([]);
-  const { addLog } = useLogStore();
+  const [isViewing, setIsViewing] = React.useState(false);
 
-  const handlePromptAction = async (prompt: Prompt) => {
-    try {
-      setIsExecuting(true);
-      setPromptResult(null);
-      const promptDetails = await onGetPromptDetails(prompt.name);
-      setSelectedPrompt(promptDetails);
-      setParamValues({});
-      setValidationErrors([]);
-      setIsModalOpen(true);
-    } catch (error) {
-      addLog({
-        type: "prompt",
-        operation: "View Prompt",
-        status: "error",
-        name: prompt.name,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to get prompt details",
-      });
-    } finally {
-      setIsExecuting(false);
+  React.useEffect(() => {
+    if (selectedPrompt?.arguments) {
+      const schema = createSchemaFromPromptArgs(selectedPrompt.arguments);
+      const emptyValues = createEmptyValues(schema);
+      setValues(emptyValues);
+    } else {
+      reset();
     }
-  };
+    // Clear previous results when prompt changes
+    setExecuteResult(undefined);
+    setExecuteError(undefined);
+    setViewResult(undefined);
+    setViewError(undefined);
+    setIsExecuting(false);
+    setIsViewing(false);
+  }, [selectedPrompt, reset, createEmptyValues, setValues]);
 
-  const handleParamChange = (key: string, value: string) => {
-    setParamValues((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const validateParams = (
-    params: Record<string, string>
-  ): ValidationError[] => {
-    const errors: ValidationError[] = [];
-    const required = selectedPrompt?.inputSchema?.required || [];
-
-    required.forEach((key) => {
-      if (!params[key] || params[key].trim() === "") {
-        errors.push({
-          path: [key],
-          message: "This field is required",
-        });
+  const handlePromptView = async (prompt: Prompt) => {
+    try {
+      const schema = createSchemaFromPromptArgs(prompt.arguments || []);
+      if (!validate(schema)) {
+        return;
       }
-    });
 
-    return errors;
+      setIsViewing(true);
+      setViewError(undefined);
+      const result = await onGetPromptDetails({
+        name: prompt.name,
+        arguments: values as Record<string, string>,
+      });
+      setViewResult(result);
+      logSuccess(
+        "View Prompt",
+        prompt.name,
+        values as Record<string, string>,
+        result
+      );
+      return result;
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      setViewError(errorMessage);
+      logError(
+        "View Prompt",
+        prompt.name,
+        errorMessage,
+        values as Record<string, string>
+      );
+      throw error;
+    } finally {
+      setIsViewing(false);
+    }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedPrompt) return;
-
-    const errors = validateParams(paramValues);
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      return;
-    }
-
-    setIsExecuting(true);
+  const handlePromptExecute = async (prompt: Prompt) => {
     try {
-      const result = await onExecutePrompt(selectedPrompt.name, paramValues);
-      setPromptResult(result);
-      addLog({
-        type: "prompt",
-        operation: "Execute Prompt",
-        status: "success",
-        name: selectedPrompt.name,
-        params: paramValues,
-        result,
+      const schema = createSchemaFromPromptArgs(prompt.arguments || []);
+      if (!validate(schema)) {
+        return;
+      }
+
+      setIsExecuting(true);
+      setExecuteError(undefined);
+      const result = await onExecutePrompt({
+        name: prompt.name,
+        arguments: values as Record<string, string>,
       });
+      if (result.error) {
+        setExecuteError(result.error);
+        logError(
+          "Execute Prompt",
+          prompt.name,
+          result.error,
+          values as Record<string, string>
+        );
+        throw new Error(result.error);
+      }
+      setExecuteResult(result.response);
+      logSuccess(
+        "Execute Prompt",
+        prompt.name,
+        values as Record<string, string>,
+        result
+      );
+      return result;
     } catch (error) {
-      addLog({
-        type: "prompt",
-        operation: "Execute Prompt",
-        status: "error",
-        name: selectedPrompt.name,
-        params: paramValues,
-        error: error instanceof Error ? error.message : "Operation failed",
-      });
-      setValidationErrors([
-        {
-          path: [],
-          message: error instanceof Error ? error.message : "Operation failed",
-        },
-      ]);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      setExecuteError(errorMessage);
+      logError(
+        "Execute Prompt",
+        prompt.name,
+        errorMessage,
+        values as Record<string, string>
+      );
+      throw error;
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const handleClose = () => {
-    setIsModalOpen(false);
-    setSelectedPrompt(null);
-    setParamValues({});
-    setPromptResult(null);
-    setValidationErrors([]);
-  };
-
-  if (!hasListPromptsCapability) {
-    return null;
+  if (!isConnected) {
+    return (
+      <BaseCard
+        title="Available Prompts"
+        subtitle="0 prompts available"
+        icon="solar:document-text-line-duotone"
+        isEmpty={false}
+        headerAction={
+          <div className="flex items-center gap-2">
+            <StatusIndicator
+              type="danger"
+              title="Connection Error"
+              description="Failed to connect to server. Prompts are unavailable."
+            />
+            <Tooltip content="Refresh available prompts">
+              <RefreshButton
+                onPress={() => {}}
+                loading={false}
+                aria-label="Refresh prompts list"
+              />
+            </Tooltip>
+          </div>
+        }
+      >
+        {null}
+      </BaseCard>
+    );
   }
 
   return (
     <BaseCard
-      icon="solar:document-text-line-duotone"
       title="Available Prompts"
-      subtitle={
-        prompts.length > 0
-          ? `${prompts.length} prompt${
-              prompts.length === 1 ? "" : "s"
-            } available`
-          : "No prompts loaded"
-      }
+      subtitle={`${prompts.length} prompt${
+        prompts.length === 1 ? "" : "s"
+      } available`}
+      icon="solar:document-text-line-duotone"
+      isEmpty={prompts.length === 0 && !error}
       headerAction={
-        <Tooltip content="Refresh available prompts">
-          <RefreshButton
-            onPress={onFetchPrompts}
-            loading={isLoadingPrompts}
-            aria-label="Refresh prompts list"
-          />
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          {error && (
+            <StatusIndicator
+              type="danger"
+              title="Connection Error"
+              description={error}
+            />
+          )}
+          <Tooltip content="Refresh available prompts">
+            <RefreshButton
+              onPress={() => {}}
+              loading={false}
+              aria-label="Refresh prompts list"
+            />
+          </Tooltip>
+        </div>
       }
     >
-      <div className="space-y-8">
-        {error ? (
-          <StatusIndicator
-            type="danger"
-            title="Connection Error"
-            description="Failed to connect to server. Prompts are unavailable."
-            icon="solar:shield-warning-line-duotone"
+      {prompts.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {prompts.map((prompt, index) => (
+            <PromptCard
+              key={`${prompt.name}-${index}`}
+              prompt={prompt}
+              onView={() => handleOpenViewModal(prompt)}
+              onExecute={() => handleOpenExecuteModal(prompt)}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {selectedPrompt && (
+        <>
+          <PromptModal
+            isOpen={viewModalOpen}
+            onClose={handleCloseViewModal}
+            title={selectedPrompt.name}
+            description={selectedPrompt.description}
+            icon="solar:document-text-line-duotone"
+            parameters={createSchemaFromPromptArgs(
+              selectedPrompt.arguments || []
+            )}
+            parameterValues={values}
+            onParameterChange={setValue}
+            validationErrors={validationErrors}
+            requiredParameters={
+              selectedPrompt.arguments
+                ?.filter((arg) => arg.required)
+                .map((arg) => arg.name) || []
+            }
+            primaryAction={{
+              label: viewResult ? "Close" : "View Prompt",
+              loadingLabel: "Loading...",
+              onClick: viewResult
+                ? handleCloseViewModal
+                : () => handlePromptView(selectedPrompt),
+              isLoading: isViewing,
+            }}
+            error={viewError}
+            result={
+              viewResult ? JSON.stringify(viewResult, null, 2) : undefined
+            }
+            size="2xl"
           />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {prompts.map((prompt) => (
-              <PromptCard
-                key={prompt.name}
-                prompt={prompt}
-                onExecute={() => handlePromptAction(prompt)}
-                onView={() => handlePromptAction(prompt)}
-                isLoading={isExecuting}
-                aria-label={`Prompt: ${prompt.name}`}
-              />
-            ))}
-          </div>
-        )}
 
-        {!error && <ExecutionHistoryCard type="prompt" />}
+          <PromptModal
+            isOpen={executeModalOpen}
+            onClose={handleCloseExecuteModal}
+            title={selectedPrompt.name}
+            description={selectedPrompt.description}
+            icon="solar:document-text-line-duotone"
+            parameters={createSchemaFromPromptArgs(
+              selectedPrompt.arguments || []
+            )}
+            parameterValues={values}
+            onParameterChange={setValue}
+            validationErrors={validationErrors}
+            requiredParameters={
+              selectedPrompt.arguments
+                ?.filter((arg) => arg.required)
+                .map((arg) => arg.name) || []
+            }
+            primaryAction={{
+              label: executeResult ? "Close" : "Execute",
+              loadingLabel: "Executing...",
+              onClick: executeResult
+                ? handleCloseExecuteModal
+                : () => handlePromptExecute(selectedPrompt),
+              isLoading: isExecuting,
+            }}
+            error={executeError}
+            result={executeResult}
+            size="2xl"
+          />
+        </>
+      )}
 
-        <PromptModal
-          isOpen={isModalOpen}
-          onClose={handleClose}
-          title={selectedPrompt?.name || "Execute Prompt"}
-          description={selectedPrompt?.description}
-          parameters={selectedPrompt?.inputSchema?.properties}
-          parameterValues={paramValues}
-          onParameterChange={handleParamChange}
-          validationErrors={validationErrors}
-          requiredParameters={selectedPrompt?.inputSchema?.required}
-          primaryAction={{
-            label: promptResult ? "Close" : "Execute",
-            loadingLabel: "Executing...",
-            onClick: promptResult ? handleClose : handleSubmit,
-            isLoading: isExecuting,
-          }}
-          result={
-            promptResult ? JSON.stringify(promptResult, null, 2) : undefined
-          }
-        />
-      </div>
+      <ExecutionHistoryCard />
     </BaseCard>
   );
 }

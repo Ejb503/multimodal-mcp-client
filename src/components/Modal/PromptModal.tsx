@@ -4,31 +4,28 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
-  Input,
   Button,
+  Input,
 } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
 import { StatusIndicator } from "@/components/StatusIndicator/StatusIndicator";
 import { ExecuteButton } from "@/components/Button";
-
-interface PromptParameter {
-  type: string;
-  description?: string;
-}
+import type { JSONSchema7 } from "json-schema";
 
 interface ValidationError {
   path: string[];
   message: string;
 }
 
-interface PromptModalProps {
+export interface PromptModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   description?: string;
-  parameters?: Record<string, PromptParameter>;
-  parameterValues: Record<string, string>;
-  onParameterChange: (key: string, value: string) => void;
+  icon?: string;
+  parameters: JSONSchema7;
+  parameterValues: Record<string, unknown>;
+  onParameterChange: (key: string, value: unknown) => void;
   validationErrors?: ValidationError[];
   requiredParameters?: string[];
   primaryAction?: {
@@ -39,6 +36,8 @@ interface PromptModalProps {
   };
   previewContent?: string;
   result?: string;
+  error?: string;
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "full";
 }
 
 export function PromptModal({
@@ -46,7 +45,8 @@ export function PromptModal({
   onClose,
   title,
   description,
-  parameters = {},
+  icon = "solar:play-circle-line-duotone",
+  parameters,
   parameterValues,
   onParameterChange,
   validationErrors = [],
@@ -54,27 +54,27 @@ export function PromptModal({
   primaryAction,
   previewContent,
   result,
+  error,
+  size = "lg",
 }: PromptModalProps) {
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size={previewContent ? "2xl" : "lg"}
+      size={size}
       role="dialog"
+      scrollBehavior="inside"
+      classNames={{
+        body: "max-h-[60vh] overflow-y-auto",
+      }}
+      data-testid="prompt-modal"
     >
       <ModalContent>
         {(onModalClose) => (
           <>
             <ModalHeader>
               <div className="flex items-center gap-3">
-                <Icon
-                  icon={
-                    previewContent
-                      ? "solar:document-text-line-duotone"
-                      : "solar:play-circle-line-duotone"
-                  }
-                  className="h-5 w-5 text-primary"
-                />
+                <Icon icon={icon} className="h-5 w-5 text-primary" />
                 <div className="flex flex-col gap-1">
                   <h3 data-testid="prompt-modal-title">{title}</h3>
                   {description && (
@@ -90,38 +90,48 @@ export function PromptModal({
             </ModalHeader>
             <ModalBody>
               <div className="flex flex-col gap-4">
-                {validationErrors.length > 0 && (
+                {(validationErrors.length > 0 || error) && (
                   <StatusIndicator
                     type="danger"
-                    title="Validation Errors"
-                    description={validationErrors
-                      .map(
-                        (error) =>
-                          `${
-                            error.path.length > 0
-                              ? `${error.path.join(".")}: `
-                              : ""
-                          }${error.message}`
-                      )
-                      .join(", ")}
+                    title={
+                      validationErrors.length > 0
+                        ? "Validation Errors"
+                        : "Error"
+                    }
+                    description={
+                      error ||
+                      validationErrors
+                        .map(
+                          (error) =>
+                            `${
+                              error.path.length > 0
+                                ? `${error.path.join(".")}: `
+                                : ""
+                            }${error.message}`
+                        )
+                        .join(", ")
+                    }
                   />
                 )}
 
                 {!previewContent &&
                   !result &&
-                  Object.entries(parameters).map(([key, param]) => {
+                  parameters.properties &&
+                  Object.entries(parameters.properties).map(([key, schema]) => {
                     const isRequired = requiredParameters.includes(key);
                     const error = validationErrors.find(
                       (e) => e.path[0] === key
                     );
+                    const schemaObj = schema as JSONSchema7;
 
                     return (
                       <Input
                         key={key}
+                        name={key}
                         label={`${key}${isRequired ? " *" : ""}`}
-                        placeholder={param.description || `Enter ${key}`}
-                        value={parameterValues[key] || ""}
-                        type={param.type === "number" ? "number" : "text"}
+                        placeholder={schemaObj.description || `Enter ${key}`}
+                        value={String(parameterValues[key] || "")}
+                        type={schemaObj.type === "number" ? "number" : "text"}
                         isRequired={isRequired}
                         errorMessage={error?.message}
                         isInvalid={!!error}
@@ -132,7 +142,10 @@ export function PromptModal({
                   })}
 
                 {(previewContent || result) && (
-                  <pre className="bg-default-100 p-4 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap">
+                  <pre
+                    className="bg-default-100 p-4 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap"
+                    data-testid="prompt-result"
+                  >
                     {result || previewContent}
                   </pre>
                 )}
@@ -143,7 +156,14 @@ export function PromptModal({
                 color="danger"
                 variant="light"
                 onPress={onModalClose}
+                startContent={
+                  <Icon
+                    icon="solar:close-circle-line-duotone"
+                    className="text-lg"
+                  />
+                }
                 className="min-w-[100px]"
+                data-testid="prompt-cancel-button"
               >
                 Cancel
               </Button>
@@ -155,6 +175,19 @@ export function PromptModal({
                   loadingLabel={primaryAction.loadingLabel || "Loading..."}
                   className="min-w-[120px]"
                   disabled={validationErrors.length > 0}
+                  data-testid="prompt-primary-button"
+                  startContent={
+                    !primaryAction.isLoading && (
+                      <Icon
+                        icon={
+                          result
+                            ? "solar:check-circle-line-duotone"
+                            : "solar:play-circle-line-duotone"
+                        }
+                        className="text-lg"
+                      />
+                    )
+                  }
                 />
               )}
             </ModalFooter>

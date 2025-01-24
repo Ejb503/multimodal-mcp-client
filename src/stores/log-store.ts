@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { JSONSchema7 } from "json-schema";
 
 export type LogType = "tool" | "prompt" | "multimodal" | "system";
 
@@ -9,7 +10,7 @@ export interface LogEntry {
   operation: string;
   status: "success" | "error" | "info" | "warning";
   name: string;
-  params?: Record<string, unknown>;
+  params?: JSONSchema7;
   result?: unknown;
   error?: string;
   message?: string;

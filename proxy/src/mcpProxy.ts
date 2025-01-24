@@ -1,4 +1,9 @@
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { McpHandlers } from "./handlers/mcpHandlers.js";
+import { ConfigHandlers } from "./handlers/configHandlers.js";
+import { TransportHandlers } from "./handlers/transportHandlers.js";
+import { defaults } from "./config/defaults.js";
+import type { McpConfig } from "./types/index.js";
 
 export default function mcpProxy({
   transportToClient,
@@ -13,17 +18,14 @@ export default function mcpProxy({
   let transportToServerClosed = false;
 
   transportToClient.onmessage = (message) => {
-    console.log("transportToClient.onmessage", message);
     transportToServer.send(message).catch(onerror);
   };
 
   transportToServer.onmessage = (message) => {
-    console.log("transportToServer.onmessage", message);
     transportToClient.send(message).catch(onerror);
   };
 
   transportToClient.onclose = () => {
-    console.log("transportToClient.onclose");
     if (transportToServerClosed) {
       return;
     }
@@ -33,7 +35,6 @@ export default function mcpProxy({
   };
 
   transportToServer.onclose = () => {
-    console.log("transportToServer.onclose");
     if (transportToClientClosed) {
       return;
     }
@@ -44,4 +45,23 @@ export default function mcpProxy({
 
   transportToClient.onerror = onerror;
   transportToServer.onerror = onerror;
+}
+
+export class McpProxy {
+  private mcpHandlers: McpHandlers;
+  private configHandlers: ConfigHandlers;
+  private transportHandlers: TransportHandlers;
+
+  constructor(config: McpConfig) {
+    // Ensure all required properties are initialized
+    const initializedConfig: McpConfig = {
+      mcpServers: config.mcpServers || {},
+      available: config.available || {},
+      defaults: config.defaults || defaults,
+    };
+
+    this.mcpHandlers = new McpHandlers(initializedConfig);
+    this.configHandlers = new ConfigHandlers(initializedConfig);
+    this.transportHandlers = new TransportHandlers(initializedConfig);
+  }
 }

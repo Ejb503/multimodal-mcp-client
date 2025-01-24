@@ -2,10 +2,10 @@ import { ContentModal } from "./ContentModal";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-  TextContent,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useState } from "react";
-import { useLlmPrompt } from "@/features/server/hooks/useLlmPrompt";
+import { useGlobalLlm } from "@/contexts/LlmProviderContext";
+import { McpMeta } from "@/types/mcp";
 
 interface SamplingModalProps {
   isOpen: boolean;
@@ -13,6 +13,8 @@ interface SamplingModalProps {
   request: CreateMessageRequest["params"];
   onApprove: (response: CreateMessageResult) => void;
   onReject: () => void;
+
+  serverId: string;
 }
 
 export function SamplingModal({
@@ -21,59 +23,42 @@ export function SamplingModal({
   request,
   onApprove,
   onReject,
+  serverId,
 }: SamplingModalProps) {
-  const { execute, isLoading } = useLlmPrompt();
-  const [progress] = useState<string>("");
-  const [response, setResponse] = useState<CreateMessageResult>({
-    role: "assistant",
-    content: {
-      type: "text",
-      text: "",
-    } as TextContent,
-    model: "",
-  });
+  const llmProvider = useGlobalLlm();
+  const [isLoading, setIsLoading] = useState(false);
+  // Explicitly mark serverId as intentionally unused
+  void serverId;
 
   const handleSubmit = async () => {
-    console.log("Request in SamplingModal:", request);
     try {
-      const params: Record<string, string> = {};
-
-      if (typeof request.temperature === "number") {
-        params.temperature = request.temperature.toString();
-      }
-      if (typeof request.maxTokens === "number") {
-        params.maxTokens = request.maxTokens.toString();
-      }
-      if (request.stopSequences?.length) {
-        params.stopSequences = request.stopSequences.join(",");
-      }
-
-      const result = await execute(
-        {
-          name: "sampling",
-          messages: request.messages,
-          _meta: {
-            ...request._meta,
-            progress: true,
-          },
+      setIsLoading(true);
+      // Execute with LLM provider
+      const result = await llmProvider.executePrompt({
+        name: "sampling",
+        messages: request.messages,
+        params: {
+          temperature: request.temperature,
+          maxTokens: request.maxTokens,
+          stopSequences: request.stopSequences,
         },
-        params
-      );
+        _meta: request._meta as McpMeta,
+      });
 
-      const updatedResponse: CreateMessageResult = {
+      const response: CreateMessageResult = {
         role: "assistant",
         content: {
           type: "text",
-          text: result as string,
+          text: result,
         },
-        model: response.model,
+        model: "mcp-sampling",
       };
 
-      setResponse(updatedResponse);
-      onApprove(updatedResponse);
-      onClose();
+      onApprove(response);
     } catch (error) {
       console.error("Failed to execute sampling:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -98,43 +83,7 @@ export function SamplingModal({
         temperature: request.temperature,
         maxTokens: request.maxTokens,
         stopSequences: request.stopSequences?.join(", "),
-        responseSchema: request._meta?.responseSchema
-          ? JSON.stringify(request._meta.responseSchema, null, 2)
-          : undefined,
-      },
-    },
-    {
-      title: "Response",
-      content: {
-        text: (response.content as TextContent).text,
-        model: response.model,
-      },
-      isForm: true,
-      onValueChange: (key: string, value: unknown) => {
-        if (key === "text") {
-          setResponse((prev) => ({
-            ...prev,
-            content: {
-              type: "text",
-              text: value as string,
-            },
-          }));
-        } else if (key === "model") {
-          setResponse((prev) => ({
-            ...prev,
-            model: value as string,
-          }));
-        }
-      },
-      values: {
-        text: (response.content as TextContent).text,
-        model: response.model,
-      },
-    },
-    {
-      title: "Status",
-      content: {
-        progress: progress || "Waiting for execution...",
+        responseSchema: request._meta?.responseSchema,
       },
     },
   ];
@@ -149,7 +98,7 @@ export function SamplingModal({
         label: "Execute",
         loadingLabel: "Executing...",
         onClick: handleSubmit,
-        isLoading: isLoading,
+        isLoading,
       }}
     />
   );

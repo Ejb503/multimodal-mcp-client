@@ -1,136 +1,101 @@
-import {
-  Card as NextUICard,
-  CardBody,
-  CardHeader,
-  CardProps as NextUICardProps,
-} from "@nextui-org/react";
+import { Card } from "@nextui-org/react";
 import { Icon } from "@iconify/react";
-import React from "react";
+import { StatusCard } from "./StatusCard";
+import { Spinner } from "@nextui-org/react";
 
-export interface BaseCardProps
-  extends Omit<NextUICardProps, "children" | "title"> {
+interface BaseCardProps {
   icon?: string;
   iconClassName?: string;
   iconTestId?: string;
   title?: React.ReactNode;
   subtitle?: React.ReactNode;
   headerAction?: React.ReactNode;
-  headerClassName?: string;
-  bodyClassName?: string;
-  children?: React.ReactNode;
   isLoading?: boolean;
-  loadingComponent?: React.ReactNode;
   isEmpty?: boolean;
-  emptyComponent?: React.ReactNode;
-  "data-testid"?: string;
+  error?: Error | null;
+  emptyMessage?: string;
+  className?: string;
+  children?: React.ReactNode;
 }
 
+/**
+ * BaseCard component that provides consistent card layout with loading, empty, and error states
+ */
 export function BaseCard({
   icon,
-  iconClassName,
+  iconClassName = "text-primary",
   iconTestId,
   title,
   subtitle,
   headerAction,
-  headerClassName = "",
-  bodyClassName = "",
-  children,
   isLoading = false,
-  loadingComponent,
   isEmpty = false,
-  emptyComponent,
+  error = null,
+  emptyMessage = "No data available",
   className = "",
-  "data-testid": testId,
-  ...props
+  children,
 }: BaseCardProps) {
   if (isLoading) {
     return (
-      <NextUICard
-        className={`bg-default-50 ${className}`}
-        data-testid={testId}
-        {...props}
-      >
-        <CardBody>
-          {loadingComponent || (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="h-7 w-3/4 bg-default-200 rounded animate-pulse" />
-                <div className="h-5 w-16 bg-default-200 rounded-lg animate-pulse" />
-              </div>
-              <div className="h-4 w-full bg-default-100 rounded animate-pulse" />
-              <div className="h-9 w-full bg-default-200 rounded-lg animate-pulse mt-1" />
-            </div>
-          )}
-        </CardBody>
-      </NextUICard>
+      <Card className={`w-full ${className}`}>
+        <div className="h-[200px] flex items-center justify-center">
+          <Spinner size="lg" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <StatusCard
+        status="danger"
+        title="Error"
+        description={error.message}
+        icon="solar:shield-warning-bold-duotone"
+        className={className}
+      />
     );
   }
 
   if (isEmpty) {
     return (
-      <NextUICard
-        className={`bg-default-50 ${className}`}
-        data-testid={testId}
-        {...props}
-      >
-        <CardBody>
-          {emptyComponent || (
-            <div className="flex flex-col items-center justify-center p-6 text-default-400">
-              <Icon
-                icon="solar:box-minimalistic-broken"
-                className="h-12 w-12 mb-2"
-              />
-              <p>No content available</p>
-            </div>
-          )}
-        </CardBody>
-      </NextUICard>
+      <StatusCard
+        status="warning"
+        title="No Data"
+        description={emptyMessage}
+        icon="solar:server-square-line-duotone"
+        className={className}
+      />
     );
   }
 
-  const hasHeader = title || subtitle || headerAction || icon;
-
   return (
-    <NextUICard
-      className={`bg-default-50 ${className}`}
-      data-testid={testId}
-      {...props}
-    >
-      {hasHeader && (
-        <CardHeader
-          className={`flex flex-row items-center justify-between ${headerClassName}`}
-        >
-          <div className="flex items-center gap-3">
+    <Card className={`w-full ${className}`}>
+      {(title || headerAction) && (
+        <div className="flex items-start justify-between p-4 border-b border-divider">
+          <div className="flex items-center gap-2">
             {icon && (
-              <Icon
-                data-testid={iconTestId}
-                data-icon={icon}
-                icon={icon}
-                width={24}
-                className={`flex-none ${iconClassName || "text-[#f6933c]"}`}
-              />
-            )}
-            {(title || subtitle) && (
-              <div>
-                {title &&
-                  (typeof title === "string" ? (
-                    <h3 className="text-lg ">{title}</h3>
-                  ) : (
-                    title
-                  ))}
-                {subtitle &&
-                  (typeof subtitle === "string" ? (
-                    <p className="text-sm text-default-500">{subtitle}</p>
-                  ) : (
-                    subtitle
-                  ))}
+              <div
+                className={`p-2 rounded-medium bg-default-100 ${iconClassName}`}
+              >
+                <Icon
+                  icon={icon}
+                  className="text-xl"
+                  data-testid={iconTestId}
+                />
               </div>
             )}
+            <div>
+              {title && <h3 className="text-lg ">{title}</h3>}
+              {subtitle && (
+                <p className="text-sm text-default-500">{subtitle}</p>
+              )}
+            </div>
           </div>
-          {headerAction}
-        </CardHeader>
+          {headerAction && <div>{headerAction}</div>}
+        </div>
       )}
-      <CardBody className={bodyClassName}>{children}</CardBody>
-    </NextUICard>
+      <div className="p-4">{children}</div>
+    </Card>
   );
 }

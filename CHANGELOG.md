@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] - 2025-01-24
+
+### Added
+
+- Added support for multimodal agent audio streaming (#8)
+- Enhanced MCP connection handling with improved error states (#7)
+- Added robust audio sampling and processing capabilities (#8)
+- Implemented real-time audio streaming with batched queue system (#8)
+
+### Changed
+
+- Optimized MCP client performance and stability (#7)
+- Improved error handling in MCP connection lifecycle (#7)
+- Enhanced audio processing pipeline for better performance (#8)
+
+### Fixed
+
+- Resolved MCP connection stability issues (#7)
+- Fixed audio streaming edge cases and error handling (#8)
+
+## [0.3.13] - 2025-01-20
+
+### Added
+
+- Added new server management components (AvailableServerCard, McpServerCard, UserInfoCard)
+- Added ServerConnectionStatus component for improved connection state visualization
+- Added environment configuration support with env.d.ts and utils
+- Added new ControlPage component for centralized server control
+- Added ServerDetails section for enhanced server information display
+
+### Changed
+
+- Enhanced MCP context management with new McpDataContext
+- Improved server and prompt handling architecture
+- Updated modal components and tests
+- Refined sidebar implementation and testing
+- Enhanced configuration handling in multiple components
+
+### Removed
+
+- Removed deprecated prompt and parameter hooks
+- Removed outdated test files
+
 ## [0.3.12] - 2025-01-15
 
 ### Added
@@ -128,75 +171,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added new `start` script combining build and preview with proxy server
-
-### Changed
-
-- Updated font path in global CSS from `/console/font/` to `/font/`
-- Removed unused `paths-to-remove.txt` file
-
-## [0.3.2] - 2025-01-08
-
-### Changed
-
-- Removed unnecessary React imports across components for better code cleanliness
-- Improved button component implementations with better props handling
-- Enhanced server configuration to support both Windows and Linux environments
-- Optimized component rendering with proper cleanup and error handling
-- Updated type definitions for better type safety
-
-## [0.3.1] - 2025-01-08
-
-### Changed
-
-- Updated .gitignore to better manage configuration and extension files
-- Improved configuration file organization structure
-
-## [0.2.1] - 2025-01-08
-
-### Added
-
-- Added test coverage for AgentRegistryContext
-- Added documentation for agent registry feature
-
-### Fixed
-
-- Fixed commit state script output path
-
-## [0.2.0] - 2024-01-08
-
-### Breaking Changes
-
-- Removed PromptContext in favor of AgentRegistry for better agent management
-- Restructured agent configuration system with new data model
-- Updated routing structure for agent-related pages
-
-### Added
-
-- New AgentRegistry context for centralized agent management
-- Improved agent configuration UI with better tool selection
-- Enhanced settings page with detailed voice configuration display
-
-### Changed
-
-- Refactored App.tsx with cleaner component structure
-- Updated build configuration in vite.config.ts and tsconfig.json
-- Improved test coverage for LiveAPIContext
-- Streamlined agent creation workflow
-
-### Fixed
-
-- Fixed tool selection and management in agent configuration
-- Improved error handling in LiveAPIContext
-- Enhanced type safety across components
-
-## [0.4.0] - 2025-01-14
-
-### Changed
-
-- Updated README.md with new demo video links and extension installation instructions.
-- Modified `config/mcp.config.default.json` to include example-extension configuration.
-
-### Removed
-
-- Deleted `src/features/multimodal-agent/utils/show-mapping.ts` as it is no longer needed.
+- Added new `

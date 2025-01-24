@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface CollapsibleSectionProps {
   title: string;
+  titleContent?: React.ReactNode;
   children: React.ReactNode;
   defaultExpanded?: boolean;
   isExpanded?: boolean;
@@ -11,6 +12,7 @@ interface CollapsibleSectionProps {
 
 export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   title,
+  titleContent,
   children,
   defaultExpanded = true,
   isExpanded: controlledIsExpanded,
@@ -31,7 +33,7 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
         className="flex items-center justify-between w-full p-2 text-left bg-default-100 hover:bg-default-200 rounded-lg"
         aria-expanded={isExpanded}
       >
-        <span className="font-medium">{title}</span>
+        {titleContent || <span className="font-medium">{title}</span>}
         {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
       </button>
       <div

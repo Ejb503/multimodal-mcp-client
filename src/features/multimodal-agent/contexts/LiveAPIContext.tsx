@@ -1,7 +1,6 @@
 import { createContext, FC, ReactNode, useContext, useEffect } from "react";
 import { useLiveAPI, UseLiveAPIResults } from "../hooks/use-live-api";
 import { useMcp } from "@/contexts/McpContext";
-import llmConfig from "@config/llm.config.json";
 
 type LiveAPIContextType = UseLiveAPIResults;
 
@@ -12,9 +11,9 @@ export type LiveAPIProviderProps = {
 };
 
 export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
-  const API_KEY = llmConfig.config.apiKey;
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
   if (!API_KEY) {
-    throw new Error("API key not found in config/llm.config.json");
+    throw new Error("VITE_GEMINI_API_KEY not found in environment variables");
   }
 
   const { clients, executeTool } = useMcp();
@@ -26,26 +25,13 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
         client.connectionStatus === "connected" &&
         (!client.tools || client.tools.length === 0)
       ) {
-        console.log(
-          "Client connected but no tools found, attempting to fetch tools..."
-        );
-        // Trigger tool refresh for this client
         if (client.client?.listTools) {
-          client.client
-            .listTools()
-            .then((result) => {
-              if (result.tools && result.tools.length > 0) {
-                console.log(
-                  `Loaded ${result.tools.length} tools for client ${serverId}`
-                );
-              }
-            })
-            .catch((error) => {
-              console.error(
-                `Failed to load tools for client ${serverId}:`,
-                error
-              );
-            });
+          client.client.listTools().catch((error) => {
+            console.error(
+              `Failed to load tools for client ${serverId}:`,
+              error
+            );
+          });
         }
       }
     });
@@ -74,8 +60,6 @@ export const LiveAPIProvider: FC<LiveAPIProviderProps> = ({ children }) => {
           await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
           continue;
         }
-
-        // Check if the tool is available in any MCP client
         const mcpTool = availableTools.find((tool) => tool.name === toolName);
         if (!mcpTool) {
           throw new Error(

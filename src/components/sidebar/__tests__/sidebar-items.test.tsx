@@ -6,7 +6,11 @@ import { McpContext } from "../../../contexts/McpContext";
 import type {
   McpClientState,
   McpContextType,
-} from "../../../contexts/McpContext.types";
+} from "../../../types/McpContext.types";
+import { McpDataProvider } from "../../../contexts/McpDataContext";
+import { GlobalLlmProvider } from "../../../contexts/LlmProviderContext";
+import { LlmRegistryProvider } from "../../../features/llm-registry/contexts/LlmRegistryContext";
+import type { ServerConfig } from "../../../types/server.types";
 
 // Mock modules
 const mockNavigate = vi.fn();
@@ -49,6 +53,7 @@ const mockConfig = {
     "systemprompt-dev": {
       command: "npx",
       args: [],
+      env: {},
       metadata: {
         icon: "solar:programming-line-duotone",
         color: "success" as const,
@@ -59,6 +64,7 @@ const mockConfig = {
     "systemprompt-agent-server": {
       command: "npx",
       args: [],
+      env: {},
       metadata: {
         icon: "solar:programming-line-duotone",
         color: "success" as const,
@@ -71,6 +77,14 @@ const mockConfig = {
 
 vi.mock("../../../config/mcp.config.json", () => ({
   default: mockConfig,
+}));
+
+vi.mock("../../../contexts/McpDataContext", () => ({
+  McpDataProvider: ({ children }: { children: React.ReactNode }) => children,
+  useMcpServerData: () => ({
+    mcpServers: mockConfig.mcpServers as Record<string, ServerConfig>,
+    defaults: mockConfig.defaults,
+  }),
 }));
 
 const wrapper = ({ children }: { children: ReactNode }) => {
@@ -143,7 +157,15 @@ const wrapper = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <McpContext.Provider value={mockContext}>{children}</McpContext.Provider>
+    <LlmRegistryProvider>
+      <GlobalLlmProvider>
+        <McpDataProvider>
+          <McpContext.Provider value={mockContext}>
+            {children}
+          </McpContext.Provider>
+        </McpDataProvider>
+      </GlobalLlmProvider>
+    </LlmRegistryProvider>
   );
 };
 
@@ -155,10 +177,11 @@ describe("useSidebarItems", () => {
   it("should render all sidebar sections", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
-    expect(result.current.sections).toHaveLength(4);
+    expect(result.current.sections).toHaveLength(5);
     expect(result.current.sections.map((s) => s.title)).toEqual([
       "Main",
-      "Servers",
+      "Core Servers",
+      "Logs",
       "Settings",
       "Help",
     ]);
@@ -168,8 +191,9 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const mainSection = result.current.sections.find((s) => s.title === "Main");
-    expect(mainSection?.items).toHaveLength(2);
+    expect(mainSection?.items).toHaveLength(3);
     expect(mainSection?.items.map((i) => i.label)).toEqual([
+      "Control Center",
       "Agents",
       "Create Agent",
     ]);
@@ -179,7 +203,7 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const serverSection = result.current.sections.find(
-      (s) => s.title === "Servers"
+      (s) => s.title === "Core Servers"
     );
     expect(serverSection).toBeDefined();
     expect(serverSection?.items).toHaveLength(2);
@@ -192,9 +216,7 @@ describe("useSidebarItems", () => {
     expect(connectedServer?.icon).toBe(
       mockConfig.mcpServers["systemprompt-dev"].metadata.icon
     );
-    expect(connectedServer?.color).toBe(
-      mockConfig.mcpServers["systemprompt-dev"].metadata.color
-    );
+    expect(connectedServer?.color).toBe("success"); // Connected servers should use success color
     expect(connectedServer?.description).toBe(
       mockConfig.mcpServers["systemprompt-dev"].metadata.description
     );
@@ -228,7 +250,7 @@ describe("useSidebarItems", () => {
     const { result } = renderHook(() => useSidebarItems(), { wrapper });
 
     const serverSection = result.current.sections.find(
-      (s) => s.title === "Servers"
+      (s) => s.title === "Core Servers"
     );
     const items = serverSection?.items || [];
 

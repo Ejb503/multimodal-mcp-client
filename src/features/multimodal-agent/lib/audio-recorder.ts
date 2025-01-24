@@ -50,7 +50,6 @@ export class AudioRecorder extends EventEmitter {
             const src = createWorketFromSrc(workletName, AudioRecordingWorklet);
 
             await this.audioContext.audioWorklet.addModule(src);
-            console.log("Added recording worklet module");
             this.recordingWorklet = new AudioWorkletNode(
               this.audioContext,
               workletName
@@ -64,9 +63,6 @@ export class AudioRecorder extends EventEmitter {
               }
             };
             this.source.connect(this.recordingWorklet);
-            console.log("Connected recording worklet");
-
-            // vu meter worklet
             const vuWorkletName = "vu-meter";
             await this.audioContext.audioWorklet.addModule(
               createWorketFromSrc(vuWorkletName, VolMeterWorket)

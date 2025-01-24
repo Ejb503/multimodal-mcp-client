@@ -26,13 +26,12 @@ build/**/*.tsbuildinfo
 /agent/*
 # But don't ignore these specific files
 !/config/README.md
-!/config/*.default.ts
-!/config/*.default.json
+!/config/*.example.ts
+!/config/*.example.json
 !/config/*server.config.ts
 !/config/types.ts
 
 !/extensions/README.md
-!/extensions/default.json
 
 # Environment variables
 .env

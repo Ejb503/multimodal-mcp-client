@@ -157,7 +157,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl ">Settings</h1>
 
       {/* Voice Config Section */}
       <AccordionCard
@@ -302,10 +302,11 @@ export default function SettingsPage() {
               <div className="flex flex-col gap-2">
                 {config &&
                   Object.entries(config.mcpServers).map(
-                    ([name, serverConfig]) => 
+                    ([name, serverConfig]) => (
                       <div key={`server-config-card-${name}`}>
                         {renderServerCard(name, serverConfig, "mcp")}
                       </div>
+                    )
                   )}
                 {!config && (
                   <div className="bg-default-50 p-4 rounded-lg">

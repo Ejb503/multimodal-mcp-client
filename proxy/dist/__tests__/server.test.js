@@ -1,209 +1,252 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import supertest from "supertest";
-import { ProxyServer } from "../server.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createTestServer, createTestClient } from "./utils/server.js";
+import { findActualExecutable } from "spawn-rx";
+import axios from "axios";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-// Create mock instances
-const mockStream = {
-    pipe: vi.fn(),
-    compose: vi.fn(),
-    addListener: vi.fn(),
-    once: vi.fn(),
-    on: vi.fn(),
-    emit: vi.fn(),
-    removeListener: vi.fn(),
-    removeAllListeners: vi.fn(),
-    listeners: vi.fn(),
-    rawListeners: vi.fn(),
-    listenerCount: vi.fn(),
-    prependListener: vi.fn(),
-    prependOnceListener: vi.fn(),
-    eventNames: vi.fn(),
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Stream } from "stream";
+import { EventEmitter } from "events";
+import { ProxyServer } from "../server.js";
+import mcpProxy from "../mcpProxy.js";
+vi.mock("@modelcontextprotocol/sdk/server/sse.js");
+vi.mock("@modelcontextprotocol/sdk/client/stdio.js");
+vi.mock("../mcpProxy.js");
+const mockConfig = {
+    defaults: {
+        serverTypes: {
+            stdio: {
+                name: "stdio",
+                description: "Standard input/output transport",
+            },
+            sse: {
+                name: "sse",
+                description: "Server-sent events transport",
+            },
+        },
+        unconnected: {
+            name: "Not connected",
+            description: "No connection established",
+        },
+    },
+    mcpServers: {
+        default: {
+            command: "echo",
+            args: ["test"],
+        },
+    },
 };
-// Setup mocks first (these get hoisted)
+// Mock the SDK modules before any imports
+vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => ({
+    StdioClientTransport: vi.fn().mockImplementation(() => ({
+        start: vi.fn().mockResolvedValue(undefined),
+        stderr: new Stream(),
+        close: vi.fn().mockResolvedValue(undefined),
+        send: vi.fn(),
+        on: vi.fn(),
+        removeAllListeners: vi.fn(),
+    })),
+}));
 vi.mock("@modelcontextprotocol/sdk/server/sse.js", () => ({
     SSEServerTransport: vi.fn().mockImplementation(() => ({
         start: vi.fn().mockResolvedValue(undefined),
         send: vi.fn(),
-        handlePostMessage: vi.fn().mockResolvedValue(undefined),
-        handleMessage: vi.fn(),
-        close: vi.fn(),
-        _endpoint: "/message",
-        res: {},
-        _sessionId: "test-session",
-        get sessionId() {
-            return this._sessionId;
-        },
-    })),
-}));
-vi.mock("@modelcontextprotocol/sdk/client/stdio.js", () => {
-    class MockStdioTransport {
-        constructor() {
-            this.stderr = mockStream;
-            this.start = vi.fn().mockResolvedValue(undefined);
-            this.close = vi.fn();
-            this.send = vi.fn();
-            this.onmessage = vi.fn();
-            this.onclose = vi.fn();
-            this._abortController = new AbortController();
-            this._readBuffer = "";
-            this._serverParams = {};
-            this.processReadBuffer = vi.fn();
-        }
-    }
-    return {
-        StdioClientTransport: vi
-            .fn()
-            .mockImplementation(() => new MockStdioTransport()),
-    };
-});
-vi.mock("@modelcontextprotocol/sdk/client/sse.js", () => ({
-    SSEClientTransport: vi.fn().mockImplementation(() => ({
-        start: vi.fn().mockResolvedValue(undefined),
-        close: vi.fn(),
-        send: vi.fn(),
-        onmessage: vi.fn(),
-        onclose: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        on: vi.fn(),
+        removeAllListeners: vi.fn(),
+        emit: vi.fn(),
     })),
 }));
 vi.mock("spawn-rx", () => ({
-    findActualExecutable: vi
-        .fn()
-        .mockImplementation((cmd, args) => ({ cmd, args })),
-}));
-vi.mock("../mcpProxy.js", () => ({
-    default: vi.fn().mockImplementation(({ transportToClient }) => {
-        // Simulate successful connection
-        transportToClient.send({
-            jsonrpc: "2.0",
-            method: "connection/established",
-            params: { status: "connected" },
-        });
-        return Promise.resolve();
+    findActualExecutable: vi.fn().mockReturnValue({
+        cmd: "echo",
+        args: ["test"],
     }),
 }));
+vi.mock("axios");
+const mockedAxios = vi.mocked(axios);
+const mockedStdioTransport = vi.mocked(StdioClientTransport);
+const mockedSSETransport = vi.mocked(SSEServerTransport);
 describe("ProxyServer", () => {
     let server;
-    // Using type assertion since supertest types are not fully compatible with newer TypeScript
-    let request = {};
-    const mockConfig = {
-        sse: {
-            systemprompt: {
-                url: "http://localhost:3001",
-                apiKey: "test-key",
-            },
-        },
-        mcpServers: {
-            test: {
-                command: "echo",
-                args: ["test"],
-            },
-        },
-    };
+    let client;
+    const originalEnv = process.env;
     beforeEach(() => {
-        vi.clearAllMocks();
-        server = new ProxyServer(mockConfig);
-        request = supertest(server.getExpressApp());
+        process.env = { ...originalEnv };
+        process.env.SYSTEMPROMPT_API_KEY = "test-api-key";
+        const config = {
+            mcpServers: {
+                default: {
+                    command: "echo",
+                    args: ["test"],
+                },
+            },
+        };
+        server = createTestServer(config);
+        client = createTestClient(server.app);
+        // Reset mocks
+        vi.mocked(mockedAxios.get).mockReset();
+        vi.mocked(mockedAxios.post).mockReset();
+        vi.mocked(findActualExecutable).mockReset();
+        vi.mocked(mockedStdioTransport).mockReset();
+        vi.mocked(mockedSSETransport).mockReset();
     });
-    describe("GET /config", () => {
-        it("should return server configuration", async () => {
-            const response = await request.get("/config");
+    afterEach(async () => {
+        process.env = originalEnv;
+        await server.server.cleanup();
+    });
+    describe("Config endpoints", () => {
+        it("GET /config should return server configuration", async () => {
+            const response = await client.get("/config");
             expect(response.status).toBe(200);
-            expect(response.body).toEqual({
-                mcpServers: mockConfig.mcpServers,
-            });
+            expect(response.body).toHaveProperty("mcpServers");
+            expect(response.body.mcpServers).toHaveProperty("default");
         });
-        it("should handle errors gracefully", async () => {
-            vi.spyOn(JSON, "stringify").mockImplementationOnce(() => {
-                throw new Error("Mock error");
-            });
-            const response = await request.get("/config");
-            expect(response.status).toBe(500);
+        it("GET /v1/config/llm should return LLM configuration", async () => {
+            const response = await client.get("/v1/config/llm");
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveProperty("provider", "gemini");
+            expect(response.body).toHaveProperty("config");
+        });
+        it("GET /v1/config/agent should return agent configuration", async () => {
+            const response = await client.get("/v1/config/agent");
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveProperty("agents");
+            expect(response.body.agents).toBeInstanceOf(Array);
         });
     });
-    describe("GET /sse", () => {
-        it("should return 500 when serverId is missing", async () => {
-            const response = await request.get("/sse");
-            expect(response.status).toBe(500);
-            expect(response.body.error).toBe("Server ID must be specified");
+    describe("MCP endpoints", () => {
+        it("GET /v1/mcp should return MCP configuration", async () => {
+            const networkError = new Error("Network error");
+            networkError.code = "ECONNREFUSED";
+            vi.mocked(mockedAxios.get).mockRejectedValueOnce(networkError);
+            const response = await client.get("/v1/mcp");
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveProperty("mcpServers");
+            expect(response.body.mcpServers).toHaveProperty("default");
+            expect(response.body).not.toHaveProperty("_warning");
         });
-        it("should return 500 for invalid transport type", async () => {
-            const response = await request
-                .get("/sse")
-                .query({ serverId: "test", transportType: "invalid" });
-            expect(response.status).toBe(500);
-            expect(response.body.error).toBe("Invalid transport type specified");
+        it("GET /v1/user/mcp should return user MCP configuration", async () => {
+            vi.mocked(mockedAxios.get).mockRejectedValueOnce(new Error("Network error"));
+            const response = await client.get("/v1/user/mcp");
+            expect(response.status).toBe(200);
+            expect(response.body).toHaveProperty("user");
+            expect(response.body.user).toHaveProperty("name", "Default User");
         });
-        it("should handle stdio transport successfully", async () => {
-            await request
-                .get("/sse")
-                .query({ serverId: "test", transportType: "stdio" })
-                .expect("Content-Type", /text\/event-stream/)
-                .expect(200)
-                .expect((res) => {
-                expect(res.text).toContain("event: ready");
-            });
-            expect(StdioClientTransport).toHaveBeenCalled();
-            expect(vi.mocked(StdioClientTransport).mock.results[0].value.start).toHaveBeenCalled();
-        });
-        it("should handle sse transport successfully", async () => {
-            await request
-                .get("/sse")
-                .query({ serverId: "test", transportType: "sse" })
-                .expect("Content-Type", /text\/event-stream/)
-                .expect(200)
-                .expect((res) => {
-                expect(res.text).toContain("event: ready");
-            });
-            expect(SSEClientTransport).toHaveBeenCalled();
-            expect(vi.mocked(SSEClientTransport).mock.results[0].value.start).toHaveBeenCalled();
-        });
-        it("should handle transport errors", async () => {
-            const mockTransport = {
-                stderr: mockStream,
-                start: vi.fn().mockRejectedValue(new Error("Transport error")),
-                close: vi.fn(),
-                send: vi.fn(),
-                onmessage: vi.fn(),
-                onclose: vi.fn(),
+    });
+    describe("SSE connection", () => {
+        let mockTransportManager;
+        let mockSSETransport;
+        let mockResponse;
+        let mockRequest;
+        let server;
+        beforeEach(() => {
+            const responseEmitter = new EventEmitter();
+            const requestEmitter = new EventEmitter();
+            mockRequest = {
+                query: { transport: "sse" },
+                on: vi.fn(),
+                once: vi.fn(),
+                emit: requestEmitter.emit.bind(requestEmitter),
+                removeListener: vi.fn(),
             };
-            vi.mocked(StdioClientTransport).mockImplementationOnce(() => mockTransport);
-            const response = await request
-                .get("/sse")
-                .query({ serverId: "test", transportType: "stdio" });
-            expect(response.status).toBe(500);
-            expect(response.body.error).toBe("Transport error");
+            mockResponse = {
+                setHeader: vi.fn(),
+                status: vi.fn().mockReturnThis(),
+                json: vi.fn().mockReturnThis(),
+                write: vi.fn(),
+                end: vi.fn(),
+                on: vi.fn(),
+                once: vi.fn(),
+                emit: responseEmitter.emit.bind(responseEmitter),
+                removeListener: vi.fn(),
+                headersSent: false,
+            };
+            const startMock = vi.fn().mockResolvedValue(undefined);
+            mockSSETransport = {
+                start: startMock,
+                close: vi.fn().mockResolvedValue(undefined),
+                send: vi.fn(),
+                on: vi.fn(),
+                once: vi.fn(),
+                emit: vi.fn(),
+                removeListener: vi.fn(),
+                addListener: vi.fn(),
+                removeAllListeners: vi.fn(),
+                _endpoint: "/message",
+                res: mockResponse,
+                _sessionId: "test",
+                handlePostMessage: vi.fn(),
+            };
+            mockTransportManager = {
+                createTransport: vi.fn().mockResolvedValue(mockSSETransport),
+                addWebAppTransport: vi.fn(),
+                removeWebAppTransport: vi.fn(),
+                setupStderrHandler: vi.fn(),
+                createErrorHandler: vi.fn(),
+                findWebAppTransport: vi.fn(),
+            };
+            vi.mocked(SSEServerTransport).mockImplementation((_path, res) => {
+                res.setHeader("Content-Type", "text/event-stream");
+                return mockSSETransport;
+            });
+            server = new ProxyServer(mockConfig);
+            // Using Object.defineProperty to avoid TypeScript errors when accessing private members
+            Object.defineProperty(server, "transportManager", {
+                value: mockTransportManager,
+                writable: true,
+                configurable: true,
+            });
         });
-    });
-    describe("POST /message", () => {
-        it("should return 404 when session is not found", async () => {
-            const response = await request
-                .post("/message")
-                .query({ sessionId: "non-existent" });
-            expect(response.status).toBe(404);
-            expect(response.text).toBe("Session not found");
+        describe("HTTP endpoints", () => {
+            it("should accept valid transport type", async () => {
+                // Using Object.defineProperty to avoid TypeScript errors when accessing private methods
+                const handleSSE = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(server), "handleSSE")?.value.bind(server);
+                await handleSSE(mockRequest, mockResponse);
+                expect(mockResponse.setHeader).toHaveBeenCalledWith("Content-Type", "text/event-stream");
+                expect(mockTransportManager.createTransport).toHaveBeenCalledWith({
+                    transport: "sse",
+                });
+                expect(mockTransportManager.addWebAppTransport).toHaveBeenCalledWith(mockSSETransport);
+                expect(mockSSETransport.start).toHaveBeenCalled();
+                expect(mockSSETransport.send).toHaveBeenCalledWith({
+                    jsonrpc: "2.0",
+                    method: "connection/ready",
+                    params: {},
+                });
+            });
+            it("should handle transport start failure", async () => {
+                const startMock = mockSSETransport.start;
+                startMock.mockRejectedValueOnce(new Error("Start failed"));
+                const handleSSE = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(server), "handleSSE")?.value.bind(server);
+                await handleSSE(mockRequest, mockResponse);
+                expect(mockResponse.status).toHaveBeenCalledWith(500);
+                expect(mockResponse.json).toHaveBeenCalledWith({
+                    error: "Start failed",
+                });
+            });
+            it("should handle transport cleanup on connection close", async () => {
+                const handleSSE = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(server), "handleSSE")?.value.bind(server);
+                await handleSSE(mockRequest, mockResponse);
+                // Get the close handler that was registered
+                const closeHandler = mockRequest.on.mock.calls.find(([event]) => event === "close")?.[1];
+                // Call the handler directly
+                closeHandler?.();
+                expect(mockTransportManager.removeWebAppTransport).toHaveBeenCalledWith(mockSSETransport);
+            });
         });
-        it("should handle message for valid session", async () => {
-            // Add a transport to the server
-            const mockTransport = vi.mocked(SSEServerTransport).mock.results[0].value;
-            server["webAppTransports"].push(mockTransport);
-            const response = await request
-                .post("/message")
-                .query({ sessionId: "test-session" })
-                .send({ test: "message" });
-            expect(response.status).toBe(200);
-            expect(mockTransport.handlePostMessage).toHaveBeenCalled();
-        });
-        it("should handle message processing errors", async () => {
-            const mockTransport = vi.mocked(SSEServerTransport).mock.results[0].value;
-            server["webAppTransports"].push(mockTransport);
-            vi.mocked(mockTransport.handlePostMessage).mockRejectedValueOnce(new Error("Processing error"));
-            const response = await request
-                .post("/message")
-                .query({ sessionId: "test-session" })
-                .send({ test: "message" });
-            expect(response.status).toBe(500);
+        describe("Transport error handling", () => {
+            it("should handle transport errors", async () => {
+                const errorHandler = vi.fn();
+                mockTransportManager.createErrorHandler.mockReturnValue(errorHandler);
+                const handleSSE = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(server), "handleSSE")?.value.bind(server);
+                await handleSSE(mockRequest, mockResponse);
+                // Get the mcpProxy call
+                const mcpProxyCall = vi.mocked(mcpProxy).mock.calls[0][0];
+                const onError = mcpProxyCall.onerror;
+                // Call the error handler directly
+                onError(new Error("Transport error"));
+                expect(errorHandler).toHaveBeenCalledWith(new Error("Transport error"));
+            });
         });
     });
 });

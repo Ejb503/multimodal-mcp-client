@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import { Card, CardBody, Link } from "@nextui-org/react";
-import { useAuth } from "../contexts/AuthContext";
 import { ApiKeyInput } from "../components/shared/Input/ApiKeyInput";
 import { BaseButton } from "../components/shared/Button/BaseButton";
 
@@ -9,7 +8,6 @@ export default function AuthSplashPage() {
   const [geminiKey, setGeminiKey] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { setApiKey } = useAuth();
 
   const validationState = useMemo(() => {
     const requiredFields: string[] = [];
@@ -63,7 +61,7 @@ export default function AuthSplashPage() {
       }
 
       // Set the API key in context and continue
-      setApiKey(systemPromptKey);
+      // setApiKey(systemPromptKey);
     } catch (error) {
       console.error("Error:", error);
       setError(

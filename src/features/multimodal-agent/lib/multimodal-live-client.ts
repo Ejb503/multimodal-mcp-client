@@ -19,7 +19,7 @@ import {
   ToolCallCancellation,
   ToolResponseMessage,
   type LiveConfig,
-} from "../multimodal-live-types";
+} from "../../../types/multimodal-live-types";
 import { blobToJSON, base64ToArrayBuffer } from "./utils";
 import { useLogStore } from "@/stores/log-store";
 
@@ -84,8 +84,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     ws.addEventListener("message", async (evt: MessageEvent) => {
       if (evt.data instanceof Blob) {
         this.receive(evt.data);
-      } else {
-        console.log("non blob message", evt);
       }
     });
     return new Promise((resolve, reject) => {
@@ -114,7 +112,6 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
         ws.removeEventListener("error", onError);
         ws.addEventListener("close", (ev: CloseEvent) => {
-          console.log(ev);
           this.disconnect(ws);
           let reason = ev.reason || "";
           if (reason.toLowerCase().includes("error")) {
@@ -152,66 +149,72 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
   }
 
   protected async receive(blob: Blob) {
-    const response: LiveIncomingMessage = (await blobToJSON(
-      blob
-    )) as LiveIncomingMessage;
+    try {
+      const response: LiveIncomingMessage = (await blobToJSON(
+        blob
+      )) as LiveIncomingMessage;
 
-    if (isToolCallMessage(response)) {
-      this.log("Tool Call", response, "info");
-      this.emit("toolcall", response.toolCall);
-      return;
-    }
-    if (isToolCallCancellationMessage(response)) {
-      this.log("Tool Call Cancellation", response, "warning");
-      this.emit("toolcallcancellation", response.toolCallCancellation);
-      return;
-    }
-
-    if (isSetupCompleteMessage(response)) {
-      this.log("Setup Complete", response, "success");
-      this.emit("setupcomplete");
-      return;
-    }
-
-    if (isServerContentMessage(response)) {
-      const { serverContent } = response;
-
-      if (isInterrupted(serverContent)) {
-        this.log("Interrupted", response, "warning");
-        this.emit("interrupted");
+      if (isToolCallMessage(response)) {
+        this.log("Tool Call", response, "info");
+        this.emit("toolcall", response.toolCall);
         return;
       }
-      if (isTurnComplete(serverContent)) {
-        this.log("Turn Complete", response, "success");
-        this.emit("turncomplete");
+
+      if (isToolCallCancellationMessage(response)) {
+        this.log("Tool Call Cancellation", response, "warning");
+        this.emit("toolcallcancellation", response.toolCallCancellation);
+        return;
       }
 
-      if (isModelTurn(serverContent)) {
-        let parts: Part[] = serverContent.modelTurn.parts;
+      if (isSetupCompleteMessage(response)) {
+        this.log("Setup Complete", response, "success");
+        this.emit("setupcomplete");
+        return;
+      }
 
-        const audioParts = parts.filter(
-          (p) => p.inlineData && p.inlineData.mimeType.startsWith("audio/pcm")
-        );
+      if (isServerContentMessage(response)) {
+        const { serverContent } = response;
 
-        const base64s = audioParts.map((p) => p.inlineData?.data);
-        const otherParts = difference(parts, audioParts);
+        if (isModelTurn(serverContent)) {
+          let parts: Part[] = serverContent.modelTurn.parts;
 
-        base64s.forEach((b64) => {
-          if (b64) {
-            const data = base64ToArrayBuffer(b64);
-            this.emit("audio", data);
+          const audioParts = parts.filter(
+            (p) => p.inlineData && p.inlineData.mimeType.startsWith("audio/pcm")
+          );
+
+          const base64s = audioParts.map((p) => p.inlineData?.data);
+          const otherParts = difference(parts, audioParts);
+
+          base64s.forEach((b64) => {
+            if (b64) {
+              const data = base64ToArrayBuffer(b64);
+              this.emit("audio", data);
+            }
+          });
+
+          if (!otherParts.length) {
+            return;
           }
-        });
-        if (!otherParts.length) {
-          return;
+
+          parts = otherParts;
+          const content: ModelTurn = { modelTurn: { parts } };
+          this.emit("content", content);
+          this.log("Server Content", response);
         }
 
-        parts = otherParts;
-
-        const content: ModelTurn = { modelTurn: { parts } };
-        this.emit("content", content);
-        this.log("Server Content", response);
+        if (isInterrupted(serverContent)) {
+          this.log("Interrupted", response, "warning");
+          this.emit("interrupted");
+          return;
+        }
+        if (isTurnComplete(serverContent)) {
+          this.log("Turn Complete", response, "success");
+          this.emit("turncomplete");
+        }
       }
+    } catch (error) {
+      console.error("Error processing WebSocket message:", error);
+      this.log("Message Processing Error", error, "error");
     }
   }
 

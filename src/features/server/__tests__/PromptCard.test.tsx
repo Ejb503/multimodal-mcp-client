@@ -1,6 +1,7 @@
+import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import { PromptCard } from "@/components/Card/PromptCard";
+import { PromptCard } from "../../../components/Card/PromptCard";
 
 describe("PromptCard", () => {
   const mockPrompt = {
@@ -20,7 +21,7 @@ describe("PromptCard", () => {
     render(<PromptCard {...defaultProps} />);
     expect(screen.getByText("Test Prompt")).toBeInTheDocument();
     expect(screen.getByText("A test prompt")).toBeInTheDocument();
-    expect(screen.getByText("test")).toBeInTheDocument();
+    expect(screen.getByText("Prompt")).toBeInTheDocument();
   });
 
   it("calls onExecute when execute button is clicked", () => {

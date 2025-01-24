@@ -14,7 +14,8 @@ import { parseAndValidateJson } from "./utils/validation";
 const DEFAULT_MODEL = "gemini-2.0-flash-exp";
 const ERRORS = {
   NO_CONTENT: "No valid content found in messages",
-  NO_API_KEY: "Gemini API key not configured",
+  NO_API_KEY:
+    "Gemini API key not configured in environment variables (VITE_GEMINI_API_KEY)",
   NO_RESPONSE: "No response received from Gemini",
   VALIDATION_RETRY_FAILED: "JSON validation failed after retry attempt",
 } as const;
@@ -43,30 +44,25 @@ interface GeminiMessage {
 let genAI: GoogleGenerativeAI | null = null;
 
 /**
- * Initializes the Gemini API client with the provided API key
+ * Initialize the Gemini API client with the API key from environment variables
  */
-export function initializeGemini(apiKey: string): void {
-  genAI = new GoogleGenerativeAI(apiKey);
-}
+function ensureInitialized(config: GeminiConfigWithMeta) {
+  if (genAI) return;
 
-/**
- * Ensures the Gemini client is initialized
- * @throws {Error} If API key is not configured
- */
-function ensureInitialized(config: GeminiConfigWithMeta): void {
-  if (!genAI) {
-    if (!config.apiKey) {
-      throw new Error(ERRORS.NO_API_KEY);
-    }
-    initializeGemini(config.apiKey);
+  // Prioritize environment variable over config
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || config.apiKey;
+
+  if (!apiKey) {
+    throw new Error(ERRORS.NO_API_KEY);
   }
+
+  genAI = new GoogleGenerativeAI(apiKey);
 }
 
 /**
  * Determines the type of response needed based on configuration
  */
 function determineResponseType(config: GeminiConfigWithMeta): ResponseType {
-  console.log("Config:", config);
   if (config._meta?.complexResponseSchema) {
     return {
       type: "complex_schema",
@@ -215,7 +211,6 @@ async function processResponse(
       // First attempt
       const firstAttempt = parseAndValidateJson(text, responseType.schema);
       if (!firstAttempt.error) {
-        console.log("First Attempt:", firstAttempt.data);
         return { response: JSON.stringify(firstAttempt.data) };
       }
 
@@ -239,7 +234,6 @@ async function processResponse(
           error: `${ERRORS.VALIDATION_RETRY_FAILED}: ${secondAttempt.error}`,
         };
       }
-      console.log("Second Attempt:", secondAttempt.data);
       return { response: JSON.stringify(secondAttempt.data) };
     }
     case "schema":
@@ -260,20 +254,13 @@ export async function generateLlmResponse(
       throw new Error(ERRORS.NO_CONTENT);
     }
 
-    console.log(
-      "Received config in generateLlmResponse:",
-      JSON.stringify(config, null, 2)
-    );
     ensureInitialized(config);
 
     const responseType = determineResponseType(config);
-    console.log("Determined response type:", responseType);
-
     let formattedMessages = formatMessages(messages);
     const modelConfig = createModelConfig(config, responseType);
 
     if (responseType.type === "complex_schema") {
-      console.log("Handling complex schema with:", responseType.schema);
       formattedMessages = appendSchemaInstruction(
         formattedMessages,
         responseType.schema
