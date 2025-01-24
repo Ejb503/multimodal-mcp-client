@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "systemprompt-mcp-core-local": {
+      "command": "node",
+      "args": [
+        "\\systemprompt-agent-server\\build\\index.js"
+      ],
+      "env": [
+        "SYSTEMPROMPT_API_KEY"
+      ],
+      "metadata": {
+        "icon": "solar:notebook-line-duotone",
+        "description": "Custom Systemprompt Notion MCP server"
+      }
+    }
+  }
+}
