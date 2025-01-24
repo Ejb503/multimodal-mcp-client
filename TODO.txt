@@ -1,0 +1,2 @@
+1. Restart connection when agent is selected
+2. Simplify agent logic, test e2e agent flow
