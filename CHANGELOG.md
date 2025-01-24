@@ -5,30 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.14] - 2025-01-21
+## [0.3.14] - 2025-01-24
 
 ### Added
 
-- Added CLI preflight checks for environment setup
-- Added improved error handling and logging with chalk
-- Added graceful server shutdown handling
-- Added automatic port retry on conflicts
-- Added new transport management system
+- Added support for multimodal agent audio streaming (#8)
+- Enhanced MCP connection handling with improved error states (#7)
+- Added robust audio sampling and processing capabilities (#8)
+- Implemented real-time audio streaming with batched queue system (#8)
 
 ### Changed
 
-- Enhanced proxy server architecture with better error handling
-- Improved configuration management and validation
-- Updated environment variable handling
-- Optimized server startup and shutdown processes
-- Enhanced UI components with better error states
-- Updated package dependencies
+- Optimized MCP client performance and stability (#7)
+- Improved error handling in MCP connection lifecycle (#7)
+- Enhanced audio processing pipeline for better performance (#8)
 
 ### Fixed
 
-- Fixed API key handling in configuration
-- Improved error handling in transport layer
-- Enhanced server stability with better cleanup
+- Resolved MCP connection stability issues (#7)
+- Fixed audio streaming edge cases and error handling (#8)
 
 ## [0.3.13] - 2025-01-20
 
