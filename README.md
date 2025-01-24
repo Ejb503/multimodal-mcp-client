@@ -9,11 +9,11 @@
 
 [Website](https://systemprompt.io) • [Documentation](https://systemprompt.io/documentation) • [Blog](https://tyingshoelaces.com) • [Get API Key](https://systemprompt.io/console)
 
-A modern voice-controlled AI interface powered by Google Gemini and Anthropic MCP (Model Control Protocol). Transform how you interact with AI through natural speech and multimodal inputs.
-
 </div>
 
-> **⚠️ Important Note**: This project is currently in development and in early access. It is not currently compatible with Safari but has been tested on Chrome with Linux, Windows, and MacOS. If you have any problems, please let us know on Discord or GitHub.
+A modern voice-controlled AI interface powered by Google Gemini and Anthropic MCP (Model Control Protocol). Transform how you interact with AI through natural speech and multimodal inputs.
+
+> **⚠️ Important Note**: This open source project is currently in development and in early access. It is not currently compatible with Safari but has been tested on Chrome with Linux, Windows, and MacOS. If you have any problems, please let us know on Discord or GitHub.
 
 If you find this project useful, please consider:
 
