@@ -128,16 +128,28 @@ export function AgentRegistryProvider({ children }: Props) {
 
     // Create a map of agents by ID, preferring user agents over system agents
     const uniqueAgents = new Map<string, AgentConfig>();
+    const nameOccurrences = new Map<string, number>();
 
     // First add all user agents (from backend)
     mappedBackendAgents.forEach((agent) => {
-      uniqueAgents.set(agent.id, agent);
+      // Track name occurrences
+      const count = nameOccurrences.get(agent.name) || 0;
+      nameOccurrences.set(agent.name, count + 1);
+
+      // Append suffix if name is duplicate
+      const finalName = count > 0 ? `${agent.name} (${count + 1})` : agent.name;
+      uniqueAgents.set(agent.id, { ...agent, name: finalName });
     });
 
     // Then add system agents, but only if an agent with that ID doesn't already exist
     serverAgents.forEach((agent) => {
       if (!uniqueAgents.has(agent.id)) {
-        uniqueAgents.set(agent.id, agent);
+        const count = nameOccurrences.get(agent.name) || 0;
+        nameOccurrences.set(agent.name, count + 1);
+
+        const finalName =
+          count > 0 ? `${agent.name} (${count + 1})` : agent.name;
+        uniqueAgents.set(agent.id, { ...agent, name: finalName });
       }
     });
 

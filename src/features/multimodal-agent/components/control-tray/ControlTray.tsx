@@ -2,7 +2,7 @@ import cn from "classnames";
 import { memo, useEffect, useRef, useState } from "react";
 import { Icon } from "@iconify/react";
 import { useNavigate } from "react-router-dom";
-import { Select, SelectItem } from "@nextui-org/react";
+import { Select, SelectItem, Tooltip } from "@nextui-org/react";
 import { useLiveAPIContext } from "../../contexts/LiveAPIContext";
 import { useAgentRegistry } from "@/features/agent-registry/contexts/AgentRegistryContext";
 import { AudioRecorder } from "../../lib/audio-recorder";
@@ -18,7 +18,8 @@ function ControlTray() {
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const { client, connected, connect, disconnect, volume } =
     useLiveAPIContext();
-  const { agents, activeAgent, setActiveAgent } = useAgentRegistry();
+  const { agents, activeAgent, setActiveAgent, activeTools } =
+    useAgentRegistry();
 
   useEffect(() => {
     if (!connected && connectButtonRef.current) {
@@ -201,6 +202,48 @@ function ControlTray() {
                 </SelectItem>
               ))}
             </Select>
+            <Tooltip
+              content={
+                activeTools.length > 0
+                  ? `${activeTools.length} tools available`
+                  : "Connect to a server to use tools"
+              }
+              placement="bottom"
+              delay={0}
+              closeDelay={0}
+              classNames={{
+                content: cn(
+                  "px-2 py-1 text-tiny font-medium",
+                  activeTools.length > 0
+                    ? "bg-default-100"
+                    : "bg-danger/10 text-danger"
+                ),
+              }}
+            >
+              <div className="relative flex items-center justify-center h-12 w-12 rounded-lg bg-content2/40 hover:bg-content2/60 transition-all duration-200 group cursor-pointer">
+                <Icon
+                  icon="mdi:tools"
+                  className={cn(
+                    "text-2xl",
+                    activeTools.length > 0 ? "text-default-600" : "text-danger",
+                    "group-hover:scale-105 transition-transform duration-200"
+                  )}
+                />
+                <div
+                  className={cn(
+                    "absolute -top-2 -right-2 min-w-[20px] h-[20px]",
+                    "flex items-center justify-center",
+                    "rounded-full text-tiny font-semibold",
+                    "border-2 border-background",
+                    activeTools.length > 0
+                      ? "bg-primary text-white"
+                      : "bg-danger text-white"
+                  )}
+                >
+                  {activeTools.length}
+                </div>
+              </div>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-6">
