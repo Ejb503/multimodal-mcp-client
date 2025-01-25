@@ -6,7 +6,6 @@ import { parseArgs } from "node:util";
 import chalk from "chalk";
 import { ProxyServer } from "./server.js";
 import path from "node:path";
-import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -68,18 +67,6 @@ export async function main() {
   console.log(chalk.cyan("\nEnvironment Debug Info:"));
   console.log(chalk.gray("─".repeat(60)));
   console.log(chalk.yellow("Looking for .env at:"), envPath);
-
-  try {
-    console.log(chalk.green("\n.env file contents:"));
-  } catch (error) {
-    console.log(
-      chalk.red("\nCould not read .env file:"),
-      (error as Error).message
-    );
-  }
-
-  console.log(chalk.green("\nCurrent process.env:"));
-  console.log("SYSTEMPROMPT_API_KEY:", process.env.SYSTEMPROMPT_API_KEY);
   console.log(chalk.gray("─".repeat(60)));
 
   try {
