@@ -65,5 +65,8 @@ build/**/*.tsbuildinfo
 # Output
 output/
 
+# Agent
+agent/
+
 # Coverage
 coverage/
