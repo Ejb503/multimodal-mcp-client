@@ -125,10 +125,18 @@ export class McpHandlers {
 
         // Create environment record
         const envRecord = (moduleInfo.environment_variables || []).reduce(
-          (env, key) => ({
-            ...env,
-            [key]: process.env[key] || process.env[`VITE_${key}`] || "",
-          }),
+          (env, key) => {
+            // Remove VITE_ prefix if present
+            const cleanKey = key.replace(/^VITE_/, "");
+            const value =
+              process.env[cleanKey] || process.env[`VITE_${cleanKey}`] || "";
+            return {
+              ...env,
+              // Store both versions to ensure compatibility
+              [cleanKey]: value,
+              [`VITE_${cleanKey}`]: value,
+            };
+          },
           {}
         );
 
