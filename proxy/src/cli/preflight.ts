@@ -168,185 +168,186 @@ export async function loadServerConfig(): Promise<McpConfig> {
 
     // Try to load custom servers from file
     spinner.start("Loading custom server configurations...");
+    let customConfig = { mcpServers: {} };
     try {
       const customConfigPath = path.join("config", "mcp.config.custom.json");
       const customConfigStr = await fs.readFile(customConfigPath, "utf-8");
-      const customConfig = JSON.parse(customConfigStr);
-
-      type ServerConfigInput = {
-        command: string;
-        args: string[];
-        env?: string[] | Record<string, string>;
-        metadata?: {
-          icon?: string;
-          description?: string;
-        };
-        agent?: unknown[];
-        id?: string;
-      };
-
-      // Type guard for ServerConfig
-      function isServerConfig(value: unknown): value is ServerConfigInput {
-        if (typeof value !== "object" || value === null) return false;
-
-        const candidate = value as {
-          command?: unknown;
-          args?: unknown;
-          id?: unknown;
-        };
-
-        return (
-          typeof candidate.command === "string" &&
-          Array.isArray(candidate.args) &&
-          (candidate.id === undefined || typeof candidate.id === "string")
-        );
-      }
-
-      // Collect all server configurations
-      const allCustomServers = {
-        // Get servers from mcpServers object
-        ...(customConfig.mcpServers || {}),
-        // Get any root-level server configurations
-        ...Object.fromEntries(
-          Object.entries(customConfig).filter(
-            ([key, value]) => key !== "mcpServers" && isServerConfig(value)
-          )
-        ),
-      } as Record<string, ServerConfigInput>;
-
-      // Check for any servers that require extensions
-      Object.entries(allCustomServers).forEach(([name, server]) => {
-        const args = server.args?.[0] || "";
-        // If the server path includes /extensions/systemprompt-mcp-*, check if it exists
-        const match = args.match(
-          /[/\\]extensions[/\\](systemprompt-mcp-[^/\\]+)/
-        );
-        if (match) {
-          const extensionName = match[1];
-          if (!availableExtensions.has(extensionName)) {
-            console.log(chalk.yellow("\n⚠️  Missing required extension:"));
-            console.log(
-              chalk.yellow(
-                `   Server "${name}" requires extension "${extensionName}"`
-              )
-            );
-            console.log(
-              chalk.gray("   Please install the extension and try again")
-            );
-          }
-        }
-      });
-
-      const processedBackendServers = Object.fromEntries(
-        Object.entries(backendServers).map(([name, server]) => {
-          const serverPath = path.resolve(
-            process.cwd(),
-            path.normalize(path.join("extensions", name, "build", "index.js"))
-          );
-
-          // Get API keys from the backend server config
-          const apiKeys = Object.fromEntries(
-            (server.env || []).map((key) => {
-              return [key, process.env[key] || ""];
-            })
-          );
-
-          spinner.succeed(`Found backend server: ${name}`);
-          // Create a deep copy of the server config to avoid reference issues
-          const serverConfig = {
-            id: name, // Use name as ID for backend servers
-            env: apiKeys,
-            metadata: server.metadata ? { ...server.metadata } : undefined,
-            agent: server.agent ? [...server.agent] : undefined,
-            // Always use node with the server path for backend servers
-            command: "node",
-            args: [serverPath],
-          } satisfies ServerConfig;
-
-          // Always use node directly with the server path
-          return [name, serverConfig];
-        })
-      );
-
-      // Process each custom server
-      const processedCustomServers = Object.fromEntries(
-        Object.entries(allCustomServers).map(([name, server]) => {
-          if (!server.command || server.command.trim() === "") {
-            spinner.fail(`Invalid server configuration for ${name}`);
-            throw new Error(`Server "${name}" has no command specified`);
-          }
-
-          // Convert environment variables to proper format
-          const envVars = Array.isArray(server.env)
-            ? server.env.reduce((acc: Record<string, string>, key: string) => {
-                if (process.env[key]) {
-                  acc[key] = process.env[key] as string;
-                }
-                return acc;
-              }, {})
-            : server.env || {};
-
-          const serverEnv = {
-            ...envVars,
-            SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "",
-          };
-          spinner.succeed(`Found custom server: ${name}`);
-          return [
-            name,
-            {
-              ...server,
-              id: name, // Use server name as ID for custom servers
-              command: server.command,
-              args: server.args.map((arg) =>
-                path.resolve(process.cwd(), path.normalize(arg))
-              ),
-              env: serverEnv,
-            },
-          ] as [string, McpConfig["mcpServers"][string]];
-        })
-      );
-
-      // Save the final configuration
-      const finalConfig = {
-        mcpServers: {
-          ...processedCustomServers,
-          ...processedBackendServers,
-        },
-        available: {},
-        agents: [],
-        customAgents: {},
-      };
-
-      // Load custom agents if they exist
-      try {
-        const agentConfigPath = path.join("config", "agent.config.custom.json");
-        const agentConfigStr = await fs.readFile(agentConfigPath, "utf-8");
-        const agentConfig = JSON.parse(agentConfigStr);
-        finalConfig.customAgents = agentConfig;
-      } catch (error) {
-        spinner.info("No custom agents found");
-      }
-
-      // Save the processed config back to mcp.config.json
-      const configPath = path.join("config", "mcp.config.json");
-      const configWithWarning = {
-        _warning: "This file is automatically generated. DO NOT EDIT DIRECTLY.",
-        ...finalConfig,
-      };
-      await fs.writeFile(
-        configPath,
-        JSON.stringify(configWithWarning, null, 2)
-      );
-
-      JSON.parse(await fs.readFile(configPath, "utf-8"));
-
-      spinner.succeed("Loaded and saved server configurations");
-      return finalConfig;
+      customConfig = JSON.parse(customConfigStr);
     } catch (error) {
-      spinner.fail(`Failed to load server configurations: ${error}`);
-      throw error;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        spinner.info("No custom server configurations found - using defaults");
+      } else {
+        spinner.warn(`Error reading custom config: ${error}`);
+      }
     }
-  } catch (error) {
+
+    type ServerConfigInput = {
+      command: string;
+      args: string[];
+      env?: string[] | Record<string, string>;
+      metadata?: {
+        icon?: string;
+        description?: string;
+      };
+      agent?: unknown[];
+      id?: string;
+    };
+
+    // Type guard for ServerConfig
+    function isServerConfig(value: unknown): value is ServerConfigInput {
+      if (typeof value !== "object" || value === null) return false;
+
+      const candidate = value as {
+        command?: unknown;
+        args?: unknown;
+        id?: unknown;
+      };
+
+      return (
+        typeof candidate.command === "string" &&
+        Array.isArray(candidate.args) &&
+        (candidate.id === undefined || typeof candidate.id === "string")
+      );
+    }
+
+    // Collect all server configurations
+    const allCustomServers = {
+      // Get servers from mcpServers object
+      ...(customConfig.mcpServers || {}),
+      // Get any root-level server configurations
+      ...Object.fromEntries(
+        Object.entries(customConfig).filter(
+          ([key, value]) => key !== "mcpServers" && isServerConfig(value)
+        )
+      ),
+    } as Record<string, ServerConfigInput>;
+
+    // Check for any servers that require extensions
+    Object.entries(allCustomServers).forEach(([name, server]) => {
+      const args = server.args?.[0] || "";
+      // If the server path includes /extensions/systemprompt-mcp-*, check if it exists
+      const match = args.match(
+        /[/\\]extensions[/\\](systemprompt-mcp-[^/\\]+)/
+      );
+      if (match) {
+        const extensionName = match[1];
+        if (!availableExtensions.has(extensionName)) {
+          console.log(chalk.yellow("\n⚠️  Missing required extension:"));
+          console.log(
+            chalk.yellow(
+              `   Server "${name}" requires extension "${extensionName}"`
+            )
+          );
+          console.log(
+            chalk.gray("   Please install the extension and try again")
+          );
+        }
+      }
+    });
+
+    const processedBackendServers = Object.fromEntries(
+      Object.entries(backendServers).map(([name, server]) => {
+        const serverPath = path.resolve(
+          process.cwd(),
+          path.normalize(path.join("extensions", name, "build", "index.js"))
+        );
+
+        // Get API keys from the backend server config
+        const apiKeys = Object.fromEntries(
+          (server.env || []).map((key) => {
+            return [key, process.env[key] || ""];
+          })
+        );
+
+        spinner.succeed(`Found backend server: ${name}`);
+        // Create a deep copy of the server config to avoid reference issues
+        const serverConfig = {
+          id: name, // Use name as ID for backend servers
+          env: apiKeys,
+          metadata: server.metadata ? { ...server.metadata } : undefined,
+          agent: server.agent ? [...server.agent] : undefined,
+          // Always use node with the server path for backend servers
+          command: "node",
+          args: [serverPath],
+        } satisfies ServerConfig;
+
+        // Always use node directly with the server path
+        return [name, serverConfig];
+      })
+    );
+
+    // Process each custom server
+    const processedCustomServers = Object.fromEntries(
+      Object.entries(allCustomServers).map(([name, server]) => {
+        if (!server.command || server.command.trim() === "") {
+          spinner.fail(`Invalid server configuration for ${name}`);
+          throw new Error(`Server "${name}" has no command specified`);
+        }
+
+        // Convert environment variables to proper format
+        const envVars = Array.isArray(server.env)
+          ? server.env.reduce((acc: Record<string, string>, key: string) => {
+              if (process.env[key]) {
+                acc[key] = process.env[key] as string;
+              }
+              return acc;
+            }, {})
+          : server.env || {};
+
+        const serverEnv = {
+          ...envVars,
+          SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "",
+        };
+        spinner.succeed(`Found custom server: ${name}`);
+        return [
+          name,
+          {
+            ...server,
+            id: name, // Use server name as ID for custom servers
+            command: server.command,
+            args: server.args.map((arg) =>
+              path.resolve(process.cwd(), path.normalize(arg))
+            ),
+            env: serverEnv,
+          },
+        ] as [string, McpConfig["mcpServers"][string]];
+      })
+    );
+
+    // Save the final configuration
+    const finalConfig = {
+      mcpServers: {
+        ...processedCustomServers,
+        ...processedBackendServers,
+      },
+      available: {},
+      agents: [],
+      customAgents: {},
+    };
+
+    // Load custom agents if they exist
+    try {
+      const agentConfigPath = path.join("config", "agent.config.custom.json");
+      const agentConfigStr = await fs.readFile(agentConfigPath, "utf-8");
+      const agentConfig = JSON.parse(agentConfigStr);
+      finalConfig.customAgents = agentConfig;
+    } catch (error) {
+      spinner.info("No custom agents found");
+    }
+
+    // Save the processed config back to mcp.config.json
+    const configPath = path.join("config", "mcp.config.json");
+    const configWithWarning = {
+      _warning: "This file is automatically generated. DO NOT EDIT DIRECTLY.",
+      ...finalConfig,
+    };
+    await fs.writeFile(configPath, JSON.stringify(configWithWarning, null, 2));
+
+    JSON.parse(await fs.readFile(configPath, "utf-8"));
+
+    spinner.succeed("Loaded and saved server configurations");
+    return finalConfig;
+  } catch (error: unknown) {
     spinner.fail("Failed to load configuration");
     console.error(chalk.red("Error loading server config:"), error);
     throw error;
