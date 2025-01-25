@@ -331,8 +331,10 @@ export async function loadServerConfig(): Promise<McpConfig> {
         // Convert environment variables to proper format
         const envVars = Array.isArray(server.env)
           ? server.env.reduce((acc: Record<string, string>, key: string) => {
-              if (process.env[key]) {
-                acc[key] = process.env[key] as string;
+              // Check for both regular and VITE_ prefixed versions
+              const value = process.env[key] || process.env[`VITE_${key}`];
+              if (value) {
+                acc[key] = value;
               }
               return acc;
             }, {})
@@ -340,7 +342,11 @@ export async function loadServerConfig(): Promise<McpConfig> {
 
         const serverEnv = {
           ...envVars,
-          SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY || "",
+          // Use either version of the API key
+          SYSTEMPROMPT_API_KEY:
+            process.env.SYSTEMPROMPT_API_KEY ||
+            process.env.VITE_SYSTEMPROMPT_API_KEY ||
+            "",
         };
         spinner.succeed(`Found custom server: ${name}`);
         return [
