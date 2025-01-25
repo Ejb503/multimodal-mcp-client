@@ -24,6 +24,16 @@ class McpError extends Error {
 export class McpHandlers {
   constructor(private config: McpConfig) {
     this.config = config;
+
+    // Copy all VITE_ prefixed env vars to their non-prefixed versions
+    Object.entries(process.env).forEach(([key, value]) => {
+      if (key.startsWith("VITE_") && value !== undefined) {
+        const nonPrefixedKey = key.replace(/^VITE_/, "");
+        if (!process.env[nonPrefixedKey]) {
+          process.env[nonPrefixedKey] = value;
+        }
+      }
+    });
   }
 
   private getAxiosConfig(

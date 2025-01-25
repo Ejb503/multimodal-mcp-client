@@ -33,6 +33,16 @@ export async function validateEnvironmentVariables(): Promise<void> {
     color: "cyan",
   }).start();
 
+  // First copy all VITE_ prefixed variables to their non-prefixed versions
+  Object.entries(process.env).forEach(([key, value]) => {
+    if (key.startsWith("VITE_") && value !== undefined) {
+      const nonPrefixedKey = key.replace(/^VITE_/, "");
+      if (!process.env[nonPrefixedKey]) {
+        process.env[nonPrefixedKey] = value;
+      }
+    }
+  });
+
   const missingVars: RequiredEnvVar[] = [];
 
   for (const envVar of REQUIRED_ENV_VARS) {
