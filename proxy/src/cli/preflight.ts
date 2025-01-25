@@ -147,7 +147,33 @@ export async function loadServerConfig(): Promise<McpConfig> {
 
       if (response.ok) {
         const data = await response.json();
-        backendServers = data.mcpServers || {};
+        // Create a map of installed modules
+        const installedModules = new Map(
+          data.installed.map((module: { name: string; id: string }) => [
+            module.name,
+            module.id,
+          ])
+        );
+
+        // Map available servers that are installed
+        backendServers = Object.entries(data.available || {}).reduce(
+          (servers, [name, info]: [string, any]) => {
+            if (installedModules.has(name)) {
+              servers[name] = {
+                env: info.environment_variables || [],
+                metadata: {
+                  icon: info.icon,
+                  description: info.description,
+                },
+                agent: info.agent,
+              };
+            }
+            return servers;
+          },
+          {} as Record<string, BackendServerConfig>
+        );
+
+        // Check for missing extensions
         Object.keys(backendServers).forEach((name) => {
           if (!availableExtensions.has(name)) {
             console.log(chalk.yellow("\n⚠️  Missing required extension:"));
@@ -255,7 +281,9 @@ export async function loadServerConfig(): Promise<McpConfig> {
         // Get API keys from the backend server config
         const apiKeys = Object.fromEntries(
           (server.env || []).map((key) => {
-            return [key, process.env[key] || ""];
+            // Check both with and without VITE_ prefix
+            const value = process.env[key] || process.env[`VITE_${key}`] || "";
+            return [key, value]; // Store without VITE_ prefix
           })
         );
 

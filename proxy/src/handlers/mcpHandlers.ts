@@ -123,10 +123,10 @@ export class McpHandlers {
         }
 
         // Store server by name but preserve the UUID
-        mcpServers[moduleInfo.title] = {
+        mcpServers[name] = {
           id, // Backend UUID for core servers
           command,
-          args: [moduleInfo.title],
+          args: [name],
           env: envRecord,
           metadata: {
             icon: moduleInfo.icon,
