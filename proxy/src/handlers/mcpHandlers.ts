@@ -29,11 +29,26 @@ export class McpHandlers {
   private getAxiosConfig(
     additionalConfig: Partial<AxiosRequestConfig> = {}
   ): AxiosRequestConfig {
+    // Debug logging
+    console.log("Environment variables:", {
+      SYSTEMPROMPT_API_KEY: process.env.SYSTEMPROMPT_API_KEY
+        ? "present"
+        : "missing",
+      VITE_SYSTEMPROMPT_API_KEY: process.env.VITE_SYSTEMPROMPT_API_KEY
+        ? "present"
+        : "missing",
+      NODE_ENV: process.env.NODE_ENV,
+    });
+
     const apiKey =
       process.env.SYSTEMPROMPT_API_KEY || process.env.VITE_SYSTEMPROMPT_API_KEY;
+
     if (!apiKey) {
       throw new McpError("API key not configured", 401);
     }
+
+    // Debug the actual key being used
+    console.log("Using API key starting with:", apiKey.substring(0, 4));
 
     return {
       headers: {

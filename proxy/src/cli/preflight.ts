@@ -334,19 +334,23 @@ export async function loadServerConfig(): Promise<McpConfig> {
               // Check for both regular and VITE_ prefixed versions
               const value = process.env[key] || process.env[`VITE_${key}`];
               if (value) {
+                // Store both the regular and VITE_ versions to ensure compatibility
                 acc[key] = value;
+                acc[`VITE_${key}`] = value;
               }
               return acc;
             }, {})
           : server.env || {};
 
+        const apiKey =
+          process.env.SYSTEMPROMPT_API_KEY ||
+          process.env.VITE_SYSTEMPROMPT_API_KEY ||
+          "";
         const serverEnv = {
           ...envVars,
-          // Use either version of the API key
-          SYSTEMPROMPT_API_KEY:
-            process.env.SYSTEMPROMPT_API_KEY ||
-            process.env.VITE_SYSTEMPROMPT_API_KEY ||
-            "",
+          // Store both versions of the API key for compatibility
+          SYSTEMPROMPT_API_KEY: apiKey,
+          VITE_SYSTEMPROMPT_API_KEY: apiKey,
         };
         spinner.succeed(`Found custom server: ${name}`);
         return [
