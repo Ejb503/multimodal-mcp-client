@@ -98,7 +98,7 @@ Transform your AI interactions with a powerful voice-first interface that combin
    - [Google AI Studio](https://ai.google.dev/gemini-api/docs) - Gemini API key
    - [systemprompt.io/console](https://systemprompt.io/console) - Systemprompt API key
 
-   Add keys to `.env` (see `.env.example` for reference)
+   Add keys to `.env` (see `.env.example` for reference). note that the `VITE_` prefix is required to share the keys with the MCP server and client.
 
 4. **Start development server**
    ```bash

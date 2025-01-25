@@ -45,8 +45,8 @@ The script will:
 
 The script will add/update these variables in your root `.env`:
 
-- `GOOGLE_CREDENTIALS`: Base64 encoded OAuth2 credentials
-- `GOOGLE_TOKEN`: Base64 encoded authentication token
+- `VITE_GOOGLE_CREDENTIALS`: Base64 encoded OAuth2 credentials
+- `VITE_GOOGLE_TOKEN`: Base64 encoded authentication token
 
 ## Troubleshooting
 

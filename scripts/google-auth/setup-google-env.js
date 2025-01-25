@@ -27,8 +27,8 @@ try {
       .split("\n")
       .filter(
         (line) =>
-          !line.startsWith("GOOGLE_CREDENTIALS=") &&
-          !line.startsWith("GOOGLE_TOKEN=")
+          !line.startsWith("VITE_GOOGLE_CREDENTIALS=") &&
+          !line.startsWith("VITE_GOOGLE_TOKEN=")
       )
       .join("\n");
     if (envContent && !envContent.endsWith("\n")) {
@@ -37,8 +37,8 @@ try {
   }
 
   // Add the new credentials
-  envContent += `GOOGLE_CREDENTIALS=${credentialsBase64}\n`;
-  envContent += `GOOGLE_TOKEN=${tokenBase64}\n`;
+  envContent += `VITE_GOOGLE_CREDENTIALS=${credentialsBase64}\n`;
+  envContent += `VITE_GOOGLE_TOKEN=${tokenBase64}\n`;
 
   // Write to .env file
   fs.writeFileSync(".env", envContent);
@@ -48,9 +48,6 @@ try {
   console.log(`Token file used: ${path.resolve(tokenPath)}`);
 } catch (error) {
   console.error("Error:", error.message);
-  console.log(
-    "\nUsage: node scripts/setup-env.js [credentials-path] [token-path]"
-  );
   console.log(
     "Default paths: credentials/google-credentials.json and credentials/google-token.json"
   );
