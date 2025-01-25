@@ -36,7 +36,8 @@ export async function validateEnvironmentVariables(): Promise<void> {
   const missingVars: RequiredEnvVar[] = [];
 
   for (const envVar of REQUIRED_ENV_VARS) {
-    if (!process.env[envVar]) {
+    // Check both regular and VITE_ prefixed versions
+    if (!process.env[envVar] && !process.env[`VITE_${envVar}`]) {
       missingVars.push(envVar);
     }
   }
@@ -48,7 +49,9 @@ export async function validateEnvironmentVariables(): Promise<void> {
         "\nThe following environment variables are required but missing:"
       )
     );
-    missingVars.forEach((v) => console.log(chalk.yellow(`- ${v}`)));
+    missingVars.forEach((v) =>
+      console.log(chalk.yellow(`- ${v} or VITE_${v}`))
+    );
     console.log(
       chalk.gray(
         "\nPlease add them to your .env file or set them in your environment."
@@ -73,8 +76,9 @@ export async function loadApiKey(): Promise<string> {
   const apiKeyName = "SYSTEMPROMPT_API_KEY";
   const envPath = path.resolve(process.cwd(), ".env");
 
-  // Check if API key exists in process.env
-  if (!process.env[apiKeyName]) {
+  // Check if API key exists in process.env (including VITE_ prefix)
+  const apiKey = process.env[apiKeyName] || process.env[`VITE_${apiKeyName}`];
+  if (!apiKey) {
     spinner.fail("API key not found in environment");
     throw new Error("SYSTEMPROMPT_API_KEY is not set");
   }
@@ -82,7 +86,10 @@ export async function loadApiKey(): Promise<string> {
   // Verify the API key exists in the .env file, not just process.env
   try {
     const envContent = await fs.readFile(envPath, "utf8");
-    if (!envContent?.includes(`${apiKeyName}=`)) {
+    if (
+      !envContent?.includes(`${apiKeyName}=`) &&
+      !envContent?.includes(`VITE_${apiKeyName}=`)
+    ) {
       spinner.fail("API key not found in .env file");
       throw new Error(
         "API key exists in process.env but not in .env file. Please add it to your .env file."
@@ -90,8 +97,8 @@ export async function loadApiKey(): Promise<string> {
     }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      // Create .env file if it doesn't exist
-      await fs.writeFile(envPath, `${apiKeyName}=${process.env[apiKeyName]}\n`);
+      // Create .env file if it doesn't exist, using the found API key
+      await fs.writeFile(envPath, `${apiKeyName}=${apiKey}\n`);
     } else {
       spinner.fail("Failed to verify API key in .env file");
       throw error;
@@ -99,7 +106,7 @@ export async function loadApiKey(): Promise<string> {
   }
 
   spinner.succeed("API key verified");
-  return process.env[apiKeyName];
+  return apiKey;
 }
 
 /**
@@ -156,8 +163,17 @@ export async function loadServerConfig(): Promise<McpConfig> {
         );
 
         // Map available servers that are installed
-        backendServers = Object.entries(data.available || {}).reduce(
-          (servers, [name, info]: [string, any]) => {
+        type ServerInfo = {
+          environment_variables?: string[];
+          icon?: string;
+          description?: string;
+          agent?: unknown[];
+        };
+
+        backendServers = Object.entries(
+          data.available as Record<string, ServerInfo>
+        ).reduce(
+          (servers, [name, info]) => {
             if (installedModules.has(name)) {
               servers[name] = {
                 env: info.environment_variables || [],
@@ -359,8 +375,12 @@ export async function loadServerConfig(): Promise<McpConfig> {
       const agentConfigStr = await fs.readFile(agentConfigPath, "utf-8");
       const agentConfig = JSON.parse(agentConfigStr);
       finalConfig.customAgents = agentConfig;
-    } catch (error) {
-      spinner.info("No custom agents found");
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        spinner.info("No custom agents found");
+      } else {
+        spinner.warn("Invalid custom agents configuration - skipping");
+      }
     }
 
     // Save the processed config back to mcp.config.json
