@@ -1,0 +1,18 @@
+{
+    "name": "google-auth-setup",
+    "version": "1.0.0",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "start": "ts-node --esm auth-google.ts"
+    },
+    "dependencies": {
+        "googleapis": "^129.0.0",
+        "google-auth-library": "^9.6.3"
+    },
+    "devDependencies": {
+        "ts-node": "^10.9.2",
+        "typescript": "^5.3.3",
+        "@types/node": "^20.11.19"
+    }
+}

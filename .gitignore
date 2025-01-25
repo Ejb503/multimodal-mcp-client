@@ -21,17 +21,35 @@ build/**/*.tsbuildinfo
 # Configuration files - ignore everything in these directories first
 /config/*
 /extensions/*
-/scripts/*
+
+# Scripts - ignore specific directories
+/scripts/private/*
+
+# Other directories to ignore
 /coverage/*
 /agent/*
+/credentials/*
+
+# Google auth credentials (but not the script itself)
+/scripts/google-auth/credentials/*
+/scripts/google-auth/node_modules/*
+
 # But don't ignore these specific files
+!/credentials/.gitkeep
 !/config/README.md
 !/config/*.example.ts
 !/config/*.example.json
 !/config/*server.config.ts
 !/config/types.ts
-
 !/extensions/README.md
+
+# Don't ignore google-auth script files
+!/scripts/google-auth
+!/scripts/google-auth/auth-google.ts
+!/scripts/google-auth/package.json
+!/scripts/google-auth/tsconfig.json
+!/scripts/google-auth/README.md
+!/scripts/google-auth/credentials/.gitkeep
 
 # Environment variables
 .env
@@ -47,12 +65,5 @@ build/**/*.tsbuildinfo
 # Output
 output/
 
-# Agent
-agent/
-
 # Coverage
 coverage/
-
-# Scripts
-scripts/*
-scripts
