@@ -71,14 +71,20 @@ export class TransportHandlers {
         serverConfig.env.forEach((key) => {
           // Remove VITE_ prefix if present in the key
           const cleanKey = key.replace(/^VITE_/, "");
-          env[cleanKey] = getEnvValue(cleanKey);
+          const value = getEnvValue(cleanKey);
+          // Set both versions
+          env[cleanKey] = value;
+          env[`VITE_${cleanKey}`] = value;
         });
       } else {
         // If env is an object, process each key-value pair
         Object.entries(serverConfig.env).forEach(([key, value]) => {
           // Remove VITE_ prefix if present in the key
           const cleanKey = key.replace(/^VITE_/, "");
-          env[cleanKey] = value || getEnvValue(cleanKey);
+          const finalValue = value || getEnvValue(cleanKey);
+          // Set both versions
+          env[cleanKey] = finalValue;
+          env[`VITE_${cleanKey}`] = finalValue;
         });
       }
     }
