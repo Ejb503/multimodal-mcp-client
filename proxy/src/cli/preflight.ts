@@ -33,13 +33,6 @@ export async function validateEnvironmentVariables(): Promise<void> {
     color: "cyan",
   }).start();
 
-  console.log("[0] Before copying - Current process.env:");
-  console.log("SYSTEMPROMPT_API_KEY:", process.env.SYSTEMPROMPT_API_KEY);
-  console.log(
-    "VITE_SYSTEMPROMPT_API_KEY:",
-    process.env.VITE_SYSTEMPROMPT_API_KEY
-  );
-
   // First copy all VITE_ prefixed variables to their non-prefixed versions
   Object.entries(process.env).forEach(([key, value]) => {
     if (key.startsWith("VITE_") && value !== undefined) {
@@ -49,13 +42,6 @@ export async function validateEnvironmentVariables(): Promise<void> {
       }
     }
   });
-
-  console.log("[0] After copying - Current process.env:");
-  console.log("SYSTEMPROMPT_API_KEY:", process.env.SYSTEMPROMPT_API_KEY);
-  console.log(
-    "VITE_SYSTEMPROMPT_API_KEY:",
-    process.env.VITE_SYSTEMPROMPT_API_KEY
-  );
 
   const missingVars: RequiredEnvVar[] = [];
 
