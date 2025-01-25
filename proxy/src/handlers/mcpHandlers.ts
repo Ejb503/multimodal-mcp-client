@@ -29,7 +29,8 @@ export class McpHandlers {
   private getAxiosConfig(
     additionalConfig: Partial<AxiosRequestConfig> = {}
   ): AxiosRequestConfig {
-    const apiKey = process.env.SYSTEMPROMPT_API_KEY;
+    const apiKey =
+      process.env.SYSTEMPROMPT_API_KEY || process.env.VITE_SYSTEMPROMPT_API_KEY;
     if (!apiKey) {
       throw new McpError("API key not configured", 401);
     }
