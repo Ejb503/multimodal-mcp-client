@@ -52,6 +52,16 @@ function printBanner() {
 
 // Start server
 export async function main() {
+  // Copy VITE_ prefixed variables to their non-prefixed versions at the very start
+  Object.entries(process.env).forEach(([key, value]) => {
+    if (key.startsWith("VITE_") && value !== undefined) {
+      const nonPrefixedKey = key.replace(/^VITE_/, "");
+      if (!process.env[nonPrefixedKey]) {
+        process.env[nonPrefixedKey] = value;
+      }
+    }
+  });
+
   printBanner();
 
   // Print environment debug info
