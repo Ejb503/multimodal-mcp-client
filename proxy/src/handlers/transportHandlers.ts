@@ -61,9 +61,22 @@ export class TransportHandlers {
     };
 
     // Process environment variables
-    const env: Record<string, string> = {
-      ...(process.env as Record<string, string>),
-    };
+    const env: Record<string, string> = {};
+
+    // First copy all environment variables
+    Object.entries(process.env).forEach(([key, value]) => {
+      if (value !== undefined) {
+        // If it's a VITE_ prefixed key, add both versions
+        if (key.startsWith("VITE_")) {
+          const nonPrefixedKey = key.replace(/^VITE_/, "");
+          env[nonPrefixedKey] = value;
+          env[key] = value;
+        } else {
+          // For non-VITE keys, just copy as is
+          env[key] = value;
+        }
+      }
+    });
 
     if (serverConfig.env) {
       if (Array.isArray(serverConfig.env)) {
