@@ -61,6 +61,11 @@ export interface McpConfig {
   defaults?: ServerDefaults;
   agents: SystempromptAgent[];
   customAgents?: Record<string, CustomAgent>;
+  sse?: {
+    systemprompt: {
+      url: string;
+    };
+  };
 }
 
 export interface JsonRpcMessage {

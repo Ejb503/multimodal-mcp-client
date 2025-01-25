@@ -54,9 +54,34 @@ export class TransportHandlers {
     if (!serverConfig) {
       throw new Error(`No configuration found for server2: ${serverId}`);
     }
-    const env = serverConfig.env
-      ? { ...(process.env as Record<string, string>), ...serverConfig.env }
-      : (process.env as Record<string, string>);
+
+    // Helper function to get env value checking both with and without VITE_ prefix
+    const getEnvValue = (key: string): string => {
+      return process.env[key] || process.env[`VITE_${key}`] || "";
+    };
+
+    // Process environment variables
+    const env: Record<string, string> = {
+      ...(process.env as Record<string, string>),
+    };
+
+    if (serverConfig.env) {
+      if (Array.isArray(serverConfig.env)) {
+        // If env is an array of keys, process each one
+        serverConfig.env.forEach((key) => {
+          // Remove VITE_ prefix if present in the key
+          const cleanKey = key.replace(/^VITE_/, "");
+          env[cleanKey] = getEnvValue(cleanKey);
+        });
+      } else {
+        // If env is an object, process each key-value pair
+        Object.entries(serverConfig.env).forEach(([key, value]) => {
+          // Remove VITE_ prefix if present in the key
+          const cleanKey = key.replace(/^VITE_/, "");
+          env[cleanKey] = value || getEnvValue(cleanKey);
+        });
+      }
+    }
 
     const { cmd, args } = findActualExecutable(
       serverConfig.command,
@@ -92,9 +117,16 @@ export class TransportHandlers {
     }
     const serverConfig = this.config.sse.systemprompt;
     const url = new URL(serverConfig.url);
+
+    // Helper function to get env value checking both with and without VITE_ prefix
+    const getEnvValue = (key: string): string => {
+      const cleanKey = key.replace(/^VITE_/, "");
+      return process.env[cleanKey] || process.env[`VITE_${cleanKey}`] || "";
+    };
+
     const requestInit: RequestInit = {
       headers: {
-        "api-key": process.env.SYSTEMPROMPT_API_KEY || "",
+        "api-key": getEnvValue("SYSTEMPROMPT_API_KEY"),
       },
     };
 

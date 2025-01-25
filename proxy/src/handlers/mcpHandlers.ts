@@ -111,7 +111,7 @@ export class McpHandlers {
         const envRecord = (moduleInfo.environment_variables || []).reduce(
           (env, key) => ({
             ...env,
-            [key]: process.env[key] || "",
+            [key]: process.env[key] || process.env[`VITE_${key}`] || "",
           }),
           {}
         );
@@ -123,10 +123,10 @@ export class McpHandlers {
         }
 
         // Store server by name but preserve the UUID
-        mcpServers[name] = {
+        mcpServers[moduleInfo.title] = {
           id, // Backend UUID for core servers
           command,
-          args: [name],
+          args: [moduleInfo.title],
           env: envRecord,
           metadata: {
             icon: moduleInfo.icon,
@@ -156,7 +156,11 @@ export class McpHandlers {
     const allAgents: McpAgent[] = Object.entries(response.available).reduce(
       (agents, [moduleName, moduleInfo]) => {
         // Only include agents from installed modules
-        if (moduleInfo.agent && moduleInfo.agent.length > 0 && installedModules.has(moduleName)) {
+        if (
+          moduleInfo.agent &&
+          moduleInfo.agent.length > 0 &&
+          installedModules.has(moduleName)
+        ) {
           return [...agents, ...moduleInfo.agent];
         }
         return agents;
@@ -165,23 +169,25 @@ export class McpHandlers {
     );
 
     // Add custom agents from config
-    Object.entries(this.config.customAgents || {}).forEach(([id, agentInfo]) => {
-      allAgents.push({
-        id,
-        type: "custom",
-        content: agentInfo.instruction,
-        metadata: {
-          title: agentInfo.name,
-          description: agentInfo.description,
-          tag: [],
-          created: new Date().toISOString(),
-          updated: new Date().toISOString(),
-          version: 1,
-          status: "active"
-        },
-        _link: ""
-      });
-    });
+    Object.entries(this.config.customAgents || {}).forEach(
+      ([id, agentInfo]) => {
+        allAgents.push({
+          id,
+          type: "custom",
+          content: agentInfo.instruction,
+          metadata: {
+            title: agentInfo.name,
+            description: agentInfo.description,
+            tag: [],
+            created: new Date().toISOString(),
+            updated: new Date().toISOString(),
+            version: 1,
+            status: "active",
+          },
+          _link: "",
+        });
+      }
+    );
 
     return {
       ...this.config,
