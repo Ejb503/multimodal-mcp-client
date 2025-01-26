@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "systemprompt-mcp-core": {
+      "id": "xxx",
+      "env": {
+        "SYSTEMPROMPT_API_KEY": "xxx",
+        "xxx": "xxx"
+      },
+      "command": "node",
+      "args": [
+        "/systemprompt-mcp-core/build/index.js"
+      ]
+    }
+  }
+}

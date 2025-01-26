@@ -24,6 +24,29 @@ If you find this project useful, please consider:
 
 A modern Vite + TypeScript application that enables voice-controlled AI workflows through MCP (Model Control Protocol). This project revolutionizes how you interact with AI systems by combining Google Gemini's multimodal capabilities with MCP's extensible tooling system.
 
+The Client supports both custom and systemprompt MCP servers. Systemprompt MCP servers are the default and are pre-configured with the Systemprompt Assistant, they can be installed through the UX.
+
+Custom MCP servers are not pre-configured and require a custom configuration file. 
+
+Create a local file `mcp.config.custom.json` in the `config` directory and add your MCP server configuration.
+
+```json
+{
+  "mcpServers": {
+    "my-custom-server": {
+      "id": "my-custom-server",
+      "env": {
+        "xxx": "xxx"
+      },
+      "command": "node",
+      "args": [
+        "/my-custom-server/build/index.js"
+      ]
+    }
+  }
+}
+```
+
 ## 🎯 Why Systemprompt MCP?
 
 Transform your AI interactions with a powerful voice-first interface that combines:

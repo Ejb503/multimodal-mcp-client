@@ -33,13 +33,7 @@ export async function validateEnvironmentVariables(): Promise<void> {
     color: "cyan",
   }).start();
 
-  console.log("[0] Before copying - Current process.env:");
-  console.log("SYSTEMPROMPT_API_KEY:", process.env.SYSTEMPROMPT_API_KEY);
-  console.log(
-    "VITE_SYSTEMPROMPT_API_KEY:",
-    process.env.VITE_SYSTEMPROMPT_API_KEY
-  );
-
+  console.log("[0] Mapping VITE_ prefixed variables to their non-prefixed versions:");
   // First copy all VITE_ prefixed variables to their non-prefixed versions
   Object.entries(process.env).forEach(([key, value]) => {
     if (key.startsWith("VITE_") && value !== undefined) {
@@ -49,13 +43,6 @@ export async function validateEnvironmentVariables(): Promise<void> {
       }
     }
   });
-
-  console.log("[0] After copying - Current process.env:");
-  console.log("SYSTEMPROMPT_API_KEY:", process.env.SYSTEMPROMPT_API_KEY);
-  console.log(
-    "VITE_SYSTEMPROMPT_API_KEY:",
-    process.env.VITE_SYSTEMPROMPT_API_KEY
-  );
 
   const missingVars: RequiredEnvVar[] = [];
 
@@ -216,14 +203,11 @@ export async function loadServerConfig(): Promise<McpConfig> {
         // Check for missing extensions
         Object.keys(backendServers).forEach((name) => {
           if (!availableExtensions.has(name)) {
-            console.log(chalk.yellow("\n⚠️  Missing required extension:"));
+            console.log(chalk.yellow("\n⚠️  required extension:"));
             console.log(
               chalk.yellow(
-                `   Server "${name}" is available but extension is not installed`
+                `   Server "${name}" is available but extension is not installed. NPX will be used for execution.`
               )
-            );
-            console.log(
-              chalk.gray("   Please install the extension and try again")
             );
           }
         });
