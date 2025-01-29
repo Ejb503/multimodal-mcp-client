@@ -1,16 +1,11 @@
 {
   "name": "multimodal-mcp-client",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "type": "module",
   "scripts": {
-    "proxy": "tsx --tsconfig proxy/tsconfig.json proxy/src/index.ts",
-    "dev:vite": "vite",
     "dev": "concurrently \"npm run proxy\" \"npm run dev:vite\"",
-    "build": "tsc -b && vite build",
     "lint": "npm run lint:ts && npm run lint:md",
     "lint:ts": "eslint .",
-    "preview": "vite preview",
-    "start": "npm run build && concurrently \"npm run proxy\" \"npm run preview\"",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",

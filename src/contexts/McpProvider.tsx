@@ -298,7 +298,7 @@ function McpProviderInner({ children }: { children: React.ReactNode }) {
           arguments: params.args,
         },
         CallToolResultSchema
-      )) as z.infer<typeof CallToolResultSchema>;
+      )) as CallToolResult;
       return response;
     } catch (error) {
       console.error("Debug - Error in executeTool:", {
