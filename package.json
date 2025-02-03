@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "concurrently \"npm run proxy\" \"npm run dev:vite\"",
     "dev:vite": "vite",
+    "proxy": "tsx --tsconfig proxy/tsconfig.json proxy/src/index.ts",
     "lint": "npm run lint:ts && npm run lint:md",
     "lint:ts": "eslint .",
     "test": "vitest run",
