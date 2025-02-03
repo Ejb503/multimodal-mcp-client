@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run proxy\" \"npm run dev:vite\"",
+    "dev:vite": "vite",
     "lint": "npm run lint:ts && npm run lint:md",
     "lint:ts": "eslint .",
     "test": "vitest run",
